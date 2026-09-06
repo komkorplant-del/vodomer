@@ -684,7 +684,7 @@ function renderSummary(s){
     gap = Math.round(span / (peeEvs.length-1) / 60000) + '<span class="u">мин</span>';
   }
   var cells = [
-    { v: Math.round(s.ml / cfg.goal * 100) + '<span class="u">%</span>', k: "цели по воде" },
+    { v: Math.round(s.ml / cfg.goal * 100) + '<span class="u">%</span>', k: s.tea ? "цели по жидкости" : "цели по воде" },
     { v: s.pee + '<span class="u">' + plural(s.pee,"раз","раза","раз") + '</span>', k: "сходил" },
     { v: gap, k: "средний интервал" },
     { v: vitDone + "/" + cfg.vitamins.length, k: "витамины" }
