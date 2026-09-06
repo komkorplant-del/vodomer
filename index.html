@@ -100,6 +100,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
 
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.quick.six{grid-template-columns:repeat(3,1fr)}
 .quick button{background:var(--accent);color:var(--on-accent);border-radius:11px;min-height:56px;font-weight:600;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:transform .08s ease}
 .quick button:active{transform:scale(.95)}
 .quick button span{font-family:"Spline Sans Mono",monospace;font-size:9px;letter-spacing:.06em;opacity:.75;font-weight:500}
@@ -269,12 +270,12 @@ details[open] summary::after{content:"–"}
         <div class="field"><label for="s-int">Интервал, мин</label><input id="s-int" type="number" inputmode="numeric" min="15" max="240" step="15"></div>
       </div>
       <div class="row2">
-        <div class="field"><label for="s-from">Пить с</label><input id="s-from" type="time"></div>
-        <div class="field"><label for="s-to">Пить до</label><input id="s-to" type="time"></div>
+        <div class="field"><label for="s-from">Основной приём с</label><input id="s-from" type="time"></div>
+        <div class="field"><label for="s-to">Основной приём до</label><input id="s-to" type="time"></div>
       </div>
       <div class="field">
-        <label for="s-quick">Быстрые кнопки, мл через запятую</label>
-        <input id="s-quick" type="text" inputmode="numeric" placeholder="200, 250, 350, 500">
+        <label for="s-quick">Быстрые кнопки, мл через запятую (до шести)</label>
+        <input id="s-quick" type="text" inputmode="numeric" placeholder="150, 200, 250, 300, 350, 500">
       </div>
 
       <div class="field">
@@ -317,13 +318,15 @@ var LS = "vodomer.v1";
 var SHADES = ["#F6F4DE","#F2EBB4","#EBDD84","#E2C755","#CC9E2E","#A56A12"];
 var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
+var CFG_VERSION = 3;
 var DEFAULTS = {
-  goal: 2500, interval: 90, from: "08:00", to: "22:00",
-  quick: [200,250,350,500],
+  cfgVersion: CFG_VERSION,
+  goal: 2000, interval: 90, from: "08:00", to: "18:00",
+  quick: [150,200,250,300,350,500],
   vitamins: [
-    {id:"v1", time:"08:30", name:"Витамин D3", dose:"2000 МЕ", sample:true},
-    {id:"v2", time:"08:30", name:"Омега-3",    dose:"1 капсула", sample:true},
-    {id:"v3", time:"21:30", name:"Магний",     dose:"200 мг",  sample:true}
+    {id:"v1", time:"08:30", name:"Витамин D3", dose:"2000 МЕ"},
+    {id:"v4", time:"08:30", name:"Лецитин",    dose:"с завтраком"},
+    {id:"v3", time:"21:30", name:"Магний",     dose:"200 мг"}
   ]
 };
 
@@ -370,6 +373,17 @@ function loadLocal(){
   state.settings = Object.assign({}, DEFAULTS, (saved && saved.settings) || {});
   if(!Array.isArray(state.settings.vitamins)) state.settings.vitamins = DEFAULTS.vitamins.slice();
   if(!Array.isArray(state.settings.quick) || !state.settings.quick.length) state.settings.quick = DEFAULTS.quick.slice();
+  // Настройки, сохранённые до 06.09.2026, держат старые цель и окно — подтягиваем к текущим.
+  if((state.settings.cfgVersion || 1) < CFG_VERSION){
+    state.settings.goal = DEFAULTS.goal;
+    state.settings.to = DEFAULTS.to;
+    state.settings.quick = DEFAULTS.quick.slice();
+    // Состав заменяем только если он остался примерным — свои правки не трогаем.
+    if(state.settings.vitamins.every(function(v){ return v.sample; })){
+      state.settings.vitamins = DEFAULTS.vitamins.map(function(v){ return Object.assign({}, v); });
+    }
+    state.settings.cfgVersion = CFG_VERSION;
+  }
   state.days = (saved && saved.days) || {};
 }
 function saveLocal(){
@@ -435,7 +449,11 @@ function toggleVit(vid){
   var k = todayKey();
   var evs = dayEvents(k).filter(function(e){ return e.k === "v" && e.vid === vid; });
   if(evs.length) removeEvent(evs[evs.length-1].id, k);
-  else addEvent({ id: uid(), t: Date.now(), k: "v", vid: vid });
+  else {
+    var v = null;
+    state.settings.vitamins.forEach(function(x){ if(x.id === vid) v = x; });
+    addEvent({ id: uid(), t: Date.now(), k: "v", vid: vid, vn: v ? v.name : "" });
+  }
 }
 
 /* ---------- расчёты ---------- */
@@ -503,10 +521,12 @@ function render(){
 function renderNudge(s){
   var cfg = state.settings, el = document.getElementById("nudge"), txt = document.getElementById("nudge-txt");
   var now = new Date(), nowM = now.getHours()*60 + now.getMinutes();
-  if(nowM < mins(cfg.from)){ el.className = "nudge"; txt.textContent = "Питьевое окно открывается в " + cfg.from; return; }
+  if(nowM < mins(cfg.from)){ el.className = "nudge"; txt.textContent = "Основной приём начинается в " + cfg.from; return; }
   if(nowM > mins(cfg.to)){
     el.className = "nudge";
-    txt.textContent = s.ml >= cfg.goal ? "День закрыт, цель взята" : "Питьевое окно закрыто — " + (cfg.goal - s.ml) + " мл не добрано";
+    txt.textContent = s.ml >= cfg.goal
+      ? "Основной приём закончен, цель взята"
+      : "Основной приём закончен — недобрано " + (cfg.goal - s.ml) + " мл";
     return;
   }
   if(!s.lastW){ el.className = "nudge due"; txt.textContent = "Сегодня ещё ни глотка — начните со стакана"; return; }
@@ -525,7 +545,9 @@ function renderQuick(){
   var box = document.getElementById("quick"), want = state.settings.quick.join(",");
   if(box._sig === want) return;
   box._sig = want; box.innerHTML = "";
-  state.settings.quick.slice(0,4).forEach(function(ml){
+  var list = state.settings.quick.slice(0,6);
+  box.className = "quick" + (list.length > 4 ? " six" : "");
+  list.forEach(function(ml){
     var b = document.createElement("button");
     b.innerHTML = ml + "<span>МЛ</span>";
     b.setAttribute("aria-label", "Записать " + ml + " миллилитров");
@@ -593,7 +615,7 @@ function renderLog(k, s){
     var color = e.k === "w" ? "var(--accent)" : e.k === "p" ? "var(--amber)" : "var(--line-strong)";
     var text = e.k === "w" ? '<span class="amt num">' + e.ml + '</span> мл воды'
              : e.k === "p" ? ("Мочеиспускание" + (e.shade ? ' · оттенок <span class="amt num">' + e.shade + '</span>' : ""))
-             : (esc(vitName[e.vid] || "витамин") + " принят");
+             : (esc(vitName[e.vid] || e.vn || "витамин") + " принят");
     row.innerHTML = '<div class="log-time num">' + hhmm(e.t) + '</div>' +
                     '<div class="log-mark" style="background:' + color + '"></div>' +
                     '<div class="log-text">' + text + '</div>';
@@ -712,7 +734,7 @@ function buildReport(days){
   var L = [];
   L.push("ДНЕВНИК ГИДРАТАЦИИ И ВИТАМИНОВ");
   L.push("Период: " + periodLabel(keys) + " (" + keys.length + " " + plural(keys.length,"день","дня","дней") + " с записями)");
-  L.push("Цель по воде: " + cfg.goal + " мл в сутки. Питьевое окно " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин.");
+  L.push("Цель по воде: " + cfg.goal + " мл в сутки. Основной приём " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин; после " + cfg.to + " вода тоже записывается.");
   L.push("Сутки считаются с 04:00 до 04:00.");
   L.push("План витаминов: " + (cfg.vitamins.length
     ? cfg.vitamins.map(function(v){ return v.name + (v.dose ? " " + v.dose : "") + " в " + v.time; }).join("; ")
@@ -763,7 +785,7 @@ function buildReport(days){
       L.push("  " + hhmm(e.t) + "  " + (
         e.k === "w" ? "вода " + e.ml + " мл"
       : e.k === "p" ? "мочеиспускание" + (e.shade ? ", оттенок " + e.shade : "")
-      : "витамин: " + (vitName[e.vid] || e.vid)
+      : "витамин: " + (vitName[e.vid] || e.vn || e.vid)
       ));
     });
   });
@@ -778,7 +800,7 @@ function buildCsv(days){
       rows.push([k, hhmm(e.t),
         e.k === "w" ? "вода" : e.k === "p" ? "мочеиспускание" : "витамин",
         e.k === "w" ? e.ml : "", e.shade || "",
-        e.vid ? (vitName[e.vid] || e.vid) : ""].join(","));
+        e.vid ? (vitName[e.vid] || e.vn || e.vid) : ""].join(","));
     });
   });
   return "﻿" + rows.join("\n");
@@ -846,7 +868,7 @@ document.getElementById("s-from").addEventListener("change", function(){ state.s
 document.getElementById("s-to").addEventListener("change", function(){ state.settings.to = this.value || "22:00"; touchSettings(); });
 document.getElementById("s-quick").addEventListener("change", function(){
   var v = this.value.split(",").map(function(x){ return Math.round(+x); }).filter(function(x){ return x > 0 && x <= 3000; });
-  if(v.length) { state.settings.quick = v.slice(0,4); touchSettings(); }
+  if(v.length) { state.settings.quick = v.slice(0,6); touchSettings(); }
   this.value = state.settings.quick.join(", ");
 });
 document.getElementById("vit-add").addEventListener("click", function(){
