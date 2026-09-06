@@ -312,10 +312,7 @@ summary{gap:8px}
         <label>Уведомления</label>
         <div class="nudge" id="push-state"><span class="dot"></span><span id="push-txt">Проверяю…</span></div>
         <button class="ghost primary" id="push-on" hidden>Включить уведомления</button>
-        <div id="push-key-box" hidden>
-          <p class="note" style="margin:8px 0">Готово. Осталось один раз передать этот код — уведомления начнут приходить по расписанию.</p>
-          <button class="ghost" id="push-copy">Скопировать код подписки</button>
-        </div>
+        <button class="ghost" id="push-test">Прислать проверочное сейчас</button>
         <p class="note" id="push-note"></p>
       </div>
 
@@ -451,12 +448,12 @@ function addEvent(ev){
   ev.up = Date.now();
   state.days[k].events.push(ev);
   state.days[k].events.sort(function(a,b){ return a.t - b.t; });
-  saveLocal(); render();
+  saveLocal(); render(); pushPlan();
 }
 function removeEvent(id, k){
   var d = state.days[k]; if(!d) return;
   d.events.forEach(function(e){ if(e.id === id){ e.del = 1; e.up = Date.now(); } });
-  saveLocal(); render();
+  saveLocal(); render(); pushPlan();
 }
 function addWater(ml){
   ml = Math.round(ml);
@@ -777,7 +774,7 @@ function renderVitEditor(){
     box.appendChild(row);
   });
 }
-function touchSettings(){ saveLocal(); render(); }
+function touchSettings(){ saveLocal(); render(); pushPlan(); }
 
 /* ---------- выгрузка ---------- */
 function periodLabel(keys){
@@ -1005,7 +1002,9 @@ document.getElementById("restore-file").addEventListener("change", function(){
 });
 
 /* ---------- уведомления ---------- */
-var VAPID_PUBLIC = "BCWGRRYNEpjHODmqgadbCu6X_3tlVFOeQfecqc0XH4KRC2CfGLMmdCa3vn5V7X2kGyu4bpJIrqR80S9eJGSDtaM";
+var VAPID_PUBLIC = "BE1PiUZ__b4s4elJ5sTonMOkrjn_yjOHOytzoTqLogzS87paYzEgfm6ECDQWeRmDnyC02lBnCVH5LHCZUpEgvsk";
+var PUSH_API = "https://vodomer-push.bobr-worker.workers.dev";
+var KEY_VERSION = "2";
 
 function b64ToBytes(b64){
   var pad = "=".repeat((4 - b64.length % 4) % 4);
@@ -1014,6 +1013,47 @@ function b64ToBytes(b64){
   for(var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }
+// Во сколько напомнить дальше: от последней записи плюс интервал, затем по интервалу до конца окна.
+function waterPoints(){
+  var cfg = state.settings, out = [], now = Date.now();
+  var base = new Date(); base.setSeconds(0, 0);
+  var at = function(dayShift, minutes){
+    var d = new Date(base); d.setDate(d.getDate() + dayShift);
+    d.setHours(Math.floor(minutes/60), minutes%60, 0, 0);
+    return d.getTime();
+  };
+  var fromM = mins(cfg.from), toM = mins(cfg.to), step = cfg.interval * 60000;
+  var s = dayStats(todayKey());
+  var first = s.lastW ? s.lastW + step : at(0, fromM);
+  for(var t = first; t <= at(0, toM); t += step) if(t > now) out.push(t);
+  for(var m = fromM; m <= toM; m += cfg.interval) out.push(at(1, m));   // завтра по сетке
+  return out;
+}
+function buildPlan(){
+  var cfg = state.settings, now = Date.now(), plan = [];
+  waterPoints().forEach(function(t){ plan.push({ at: t, title: "Водомер", body: "Пора попить" }); });
+  var taken = dayStats(todayKey()).vits;
+  cfg.vitamins.forEach(function(v){
+    var d = new Date(); d.setHours(Math.floor(mins(v.time)/60), mins(v.time)%60, 0, 0);
+    var text = v.name + (v.dose ? ", " + v.dose : "");
+    if(d.getTime() > now && !taken[v.id]) plan.push({ at: d.getTime(), title: "Витамины", body: text });
+    var t = new Date(d); t.setDate(t.getDate() + 1);
+    plan.push({ at: t.getTime(), title: "Витамины", body: text });
+  });
+  return plan.sort(function(a,b){ return a.at - b.at; }).slice(0, 40);
+}
+var planTimer = null;
+function pushPlan(){
+  if(!pushSub) return;
+  clearTimeout(planTimer);
+  planTimer = setTimeout(function(){
+    fetch(PUSH_API + "/plan", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: pushSub, plan: buildPlan() })
+    }).catch(function(){});
+  }, 1500);
+}
+
 function isStandalone(){
   return window.navigator.standalone === true ||
          (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
@@ -1046,10 +1086,16 @@ function refreshPushUi(){
     if(!reg){ setPushState("Приложение ещё готовится", false, false, "Перезагрузите страницу."); return; }
     return reg.pushManager.getSubscription().then(function(sub){
       if(sub){
-        setPushState("Уведомления включены", true, false,
-          "Приходят по расписанию питья и по времени витаминов.");
-        document.getElementById("push-key-box").hidden = false;
+        var ver = null;
+        try { ver = localStorage.getItem("vodomer.pushKey"); } catch(e){}
+        if(ver !== KEY_VERSION){
+          // Ключ подписи сменился — старая подписка недействительна, пересоздаём молча.
+          return sub.unsubscribe().then(function(){ return enablePush(true); });
+        }
         pushSub = sub;
+        setPushState("Уведомления включены", true, false,
+          "Приходят по вашему времени: следующий приём считается от последней записи.");
+        pushPlan();
       } else {
         setPushState("Уведомления выключены", false, true, "");
         document.getElementById("push-key-box").hidden = true;
@@ -1058,22 +1104,33 @@ function refreshPushUi(){
   }).catch(function(){});
 }
 var pushSub = null;
-function enablePush(){
-  Notification.requestPermission().then(function(perm){
+function enablePush(silent){
+  return Notification.requestPermission().then(function(perm){
     if(perm !== "granted"){ refreshPushUi(); return; }
     return navigator.serviceWorker.ready.then(function(reg){
       return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
     }).then(function(sub){
       pushSub = sub;
-      refreshPushUi();
-      toast("Готово — скопируйте код подписки");
+      try { localStorage.setItem("vodomer.pushKey", KEY_VERSION); } catch(e){}
+      return fetch(PUSH_API + "/plan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub, plan: buildPlan() })
+      }).then(function(){
+        refreshPushUi();
+        if(!silent) toast("Готово — напоминания включены");
+      });
     });
-  }).catch(function(){ toast("Не удалось включить уведомления"); });
+  }).catch(function(){ if(!silent) toast("Не удалось включить уведомления"); });
 }
 document.getElementById("push-on").addEventListener("click", enablePush);
-document.getElementById("push-copy").addEventListener("click", function(){
-  if(!pushSub){ toast("Подписки нет"); return; }
-  copyText(JSON.stringify(pushSub), "Код скопирован — отправьте его");
+document.getElementById("push-test").addEventListener("click", function(){
+  if(!pushSub){ toast("Сначала включите уведомления"); return; }
+  fetch(PUSH_API + "/test", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription: pushSub })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ toast(d.ok ? "Отправлено — ждите уведомление" : "Сервер ответил " + (d["статус"] || "?")); })
+    .catch(function(){ toast("Сервер не ответил"); });
 });
 
 if("serviceWorker" in navigator){
