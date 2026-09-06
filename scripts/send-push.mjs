@@ -48,6 +48,17 @@ const due = same.length > 1
   : ready[0];
 
 const hhmm = String(Math.floor(nowMin / 60)).padStart(2, "0") + ":" + String(nowMin % 60).padStart(2, "0");
+
+// Ручная проверка: шлём сразу, чтобы убедиться, что уведомления доходят.
+if (process.env.FORCE_TEST === "true") {
+  webpush.setVapidDetails(VAPID_SUBJECT || "mailto:kondaurov.mind@gmail.com", VAPID_PUBLIC, VAPID_PRIVATE);
+  await webpush.sendNotification(JSON.parse(PUSH_SUBSCRIPTION),
+    JSON.stringify({ title: "Водомер", body: "Проверка связи — уведомления работают", tag: "vodomer-test" }),
+    { TTL: 600 });
+  console.log(`${hhmm} — проверочное уведомление отправлено.`);
+  process.exit(0);
+}
+
 if (!due) {
   console.log(`${hhmm} ${cfg.timezone} — ни одна точка расписания не подошла, ничего не шлём.`);
   process.exit(0);

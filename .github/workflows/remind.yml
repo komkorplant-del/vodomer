@@ -6,6 +6,11 @@ on:
     # Слать или нет — решает скрипт по времени Киева, поэтому смена времени расписание не сдвигает.
     - cron: '0,30 4-20 * * *'
   workflow_dispatch:
+    inputs:
+      test:
+        description: 'Прислать проверочное уведомление сразу, не глядя на расписание'
+        type: boolean
+        default: false
 
 jobs:
   push:
@@ -22,3 +27,4 @@ jobs:
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          FORCE_TEST: ${{ inputs.test }}
