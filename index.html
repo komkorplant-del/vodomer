@@ -923,8 +923,19 @@ document.getElementById("restore-file").addEventListener("change", function(){
 });
 
 if("serviceWorker" in navigator){
+  // Контроллер уже был — значит эта вкладка работает на прежней версии,
+  // и смена контроллера означает приехавшее обновление.
+  var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    if(!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
   window.addEventListener("load", function(){
-    navigator.serviceWorker.register("sw.js").catch(function(){});
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function(reg){
+      reg.update();
+      setInterval(function(){ reg.update(); }, 3600000);
+    }).catch(function(){});
   });
 }
 })();

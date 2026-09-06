@@ -1,5 +1,5 @@
 /* Водомер — офлайн-кэш. Страница обязана открываться без сети. */
-var CACHE = "vodomer-v1";
+var CACHE = "vodomer-v2";
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e){
@@ -18,10 +18,12 @@ self.addEventListener("fetch", function(e){
   var req = e.request;
   if(req.method !== "GET") return;
 
-  // Страница: сначала сеть (чтобы приходили обновления), кэш — запасной путь.
+  // Страница: сначала сеть, кэш — запасной путь.
+  // cache:"no-cache" обязателен: GitHub Pages отдаёт страницу с max-age=600,
+  // и обычный fetch десять минут возвращает старую копию из кэша браузера.
   if(req.mode === "navigate"){
     e.respondWith(
-      fetch(req).then(function(res){
+      fetch(req.url, { cache: "no-cache" }).then(function(res){
         var copy = res.clone();
         caches.open(CACHE).then(function(c){ c.put("./index.html", copy); });
         return res;
