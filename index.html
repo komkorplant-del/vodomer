@@ -77,8 +77,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .top .date{font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted)}
 
 .gauge{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 12px;box-shadow:var(--shadow)}
-.gauge-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
-.big{font-size:42px;font-weight:700;line-height:.95;letter-spacing:-.03em}
+.gauge-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+.metric{min-width:0}
+.metric.right{text-align:right}
+.metric-k{font-family:"Spline Sans Mono",monospace;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-top:4px;white-space:nowrap}
+.big{font-size:clamp(30px,10vw,42px);font-weight:700;line-height:.95;letter-spacing:-.03em;white-space:nowrap}
+.big.rest{color:var(--muted)}
+.big.rest.over{color:var(--accent)}
 .big .u{font-family:"Spline Sans Mono",monospace;font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:5px}
 .goal-line{text-align:right;font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted);line-height:1.5}
 .goal-line b{color:var(--ink);font-weight:600}
@@ -205,8 +210,14 @@ summary{gap:8px}
 
   <section class="gauge">
     <div class="gauge-head">
-      <div class="big num"><span id="ml-total">0</span><span class="u">мл</span></div>
-      <div class="goal-line num">цель <b id="goal-txt">2500</b> мл<br><span id="goal-left">—</span></div>
+      <div class="metric">
+        <div class="big num"><span id="ml-total">0</span><span class="u">мл</span></div>
+        <div class="metric-k">выпито</div>
+      </div>
+      <div class="metric right">
+        <div class="big num rest"><span id="ml-left">0</span><span class="u">мл</span></div>
+        <div class="metric-k" id="rest-k">осталось до 2000</div>
+      </div>
     </div>
     <div class="beaker">
       <div class="beaker-fill" id="fill" style="width:0%"></div>
@@ -525,9 +536,13 @@ function render(){
   var k = todayKey(), s = dayStats(k), cfg = state.settings, now = new Date();
   document.getElementById("today-date").textContent = now.getDate() + " " + MONTHS[now.getMonth()];
   document.getElementById("ml-total").textContent = s.ml;
-  document.getElementById("goal-txt").textContent = cfg.goal;
   var left = cfg.goal - s.ml;
-  document.getElementById("goal-left").textContent = left > 0 ? ("осталось " + left) : ("+" + (-left) + " сверх");
+  var rest = document.querySelector(".big.rest");
+  document.getElementById("ml-left").textContent = left > 0 ? left : -left;
+  rest.classList.toggle("over", left <= 0);
+  document.getElementById("rest-k").innerHTML = left > 0
+    ? "осталось до " + cfg.goal
+    : 'сверх цели ' + cfg.goal;
   var pctW = Math.min(100, s.water / cfg.goal * 100);
   var pctT = Math.min(100 - pctW, s.tea / cfg.goal * 100);
   document.getElementById("fill").style.width = pctW + "%";
