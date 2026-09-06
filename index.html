@@ -106,7 +106,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
 
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.quick.six{grid-template-columns:repeat(3,1fr)}
+.quick.three{grid-template-columns:repeat(3,1fr)}
+.quick.odd > button:last-child{grid-column:span 2}
 .quick button{background:var(--accent);color:var(--on-accent);border-radius:11px;min-height:56px;font-weight:600;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:transform .08s ease}
 .quick button:active{transform:scale(.95)}
 .seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line-strong);border-radius:11px;overflow:hidden;background:var(--surface-2)}
@@ -290,8 +291,8 @@ details[open] summary::after{content:"–"}
         <div class="field"><label for="s-to">Основной приём до</label><input id="s-to" type="time"></div>
       </div>
       <div class="field">
-        <label for="s-quick">Быстрые кнопки, мл через запятую (до шести)</label>
-        <input id="s-quick" type="text" inputmode="numeric" placeholder="150, 200, 250, 300, 350, 500">
+        <label for="s-quick">Быстрые кнопки, мл через запятую (до восьми)</label>
+        <input id="s-quick" type="text" inputmode="numeric" placeholder="100, 150, 200, 250, 300, 350, 500">
       </div>
 
       <div class="field">
@@ -345,11 +346,11 @@ var LS = "vodomer.v1";
 var SHADES = ["#F6F4DE","#F2EBB4","#EBDD84","#E2C755","#CC9E2E","#A56A12"];
 var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-var CFG_VERSION = 3;
+var CFG_VERSION = 4;
 var DEFAULTS = {
   cfgVersion: CFG_VERSION,
   goal: 2000, interval: 90, from: "08:00", to: "18:00",
-  quick: [150,200,250,300,350,500],
+  quick: [100,150,200,250,300,350,500],
   vitamins: [
     {id:"v1", time:"08:30", name:"Витамин D3", dose:"2000 МЕ"},
     {id:"v4", time:"08:30", name:"Лецитин",    dose:"с завтраком"},
@@ -590,8 +591,10 @@ function renderQuick(){
   var box = document.getElementById("quick"), want = state.settings.quick.join(",");
   if(box._sig === want) return;
   box._sig = want; box.innerHTML = "";
-  var list = state.settings.quick.slice(0,6);
-  box.className = "quick" + (list.length > 4 ? " six" : "");
+  var list = state.settings.quick.slice(0,8);
+  // 5-6 кнопок ложатся в три колонки, 7-8 — в четыре; нечётный хвост растягивается на два места
+  var cols = list.length <= 4 ? 4 : (list.length <= 6 ? 3 : 4);
+  box.className = "quick" + (cols === 3 ? " three" : "") + (list.length % cols ? " odd" : "");
   list.forEach(function(ml){
     var b = document.createElement("button");
     b.innerHTML = ml + "<span>МЛ</span>";
@@ -929,7 +932,7 @@ document.getElementById("s-from").addEventListener("change", function(){ state.s
 document.getElementById("s-to").addEventListener("change", function(){ state.settings.to = this.value || "22:00"; touchSettings(); });
 document.getElementById("s-quick").addEventListener("change", function(){
   var v = this.value.split(",").map(function(x){ return Math.round(+x); }).filter(function(x){ return x > 0 && x <= 3000; });
-  if(v.length) { state.settings.quick = v.slice(0,6); touchSettings(); }
+  if(v.length) { state.settings.quick = v.slice(0,8); touchSettings(); }
   this.value = state.settings.quick.join(", ");
 });
 document.getElementById("vit-add").addEventListener("click", function(){
