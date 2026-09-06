@@ -754,7 +754,8 @@ function buildReport(days){
   L.push("");
 
   var detail = keys.slice(-3);
-  L.push("ПОДРОБНЫЙ ЛОГ ЗА ПОСЛЕДНИЕ " + detail.length + " " + plural(detail.length,"ДЕНЬ","ДНЯ","ДНЕЙ"));
+  L.push(detail.length === 1 ? "ПОДРОБНЫЙ ЛОГ ЗА ПОСЛЕДНИЙ ДЕНЬ"
+                             : "ПОДРОБНЫЙ ЛОГ ЗА ПОСЛЕДНИЕ " + detail.length + " " + plural(detail.length,"ДЕНЬ","ДНЯ","ДНЕЙ"));
   detail.forEach(function(k){
     L.push("");
     L.push(k + " (" + ruDate(k) + ")");
