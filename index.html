@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Водомер</title>
+<meta name="description" content="Дневник воды, витаминов и мочеиспусканий. Вводите только количество — время записывается само.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Водомер">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EFF3F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1211" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EFF3F2; --surface:#FFFFFF; --surface-2:#F6F9F8;
+  --line:#D9E2E0; --line-strong:#B9C7C4;
+  --ink:#0E1E1C; --muted:#5A6D6A; --faint:#8DA09D;
+  --accent:#00706A; --accent-soft:#D6EBE8; --accent-ink:#004F4A; --on-accent:#FFFFFF;
+  --amber:#A86F14; --amber-soft:#F3E6CC;
+  --warn:#B0421F;
+  --shadow:0 1px 2px rgba(14,30,28,.06), 0 6px 20px rgba(14,30,28,.05);
+  --r:14px;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1211; --surface:#131E1D; --surface-2:#182524;
+    --line:#263634; --line-strong:#3A4E4B;
+    --ink:#E7EEEC; --muted:#93A6A3; --faint:#6E827F;
+    --accent:#42BFB3; --accent-soft:#123330; --accent-ink:#8FDAD2; --on-accent:#06201E;
+    --amber:#D9A548; --amber-soft:#33280F;
+    --warn:#E4784F;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1211; --surface:#131E1D; --surface-2:#182524;
+  --line:#263634; --line-strong:#3A4E4B;
+  --ink:#E7EEEC; --muted:#93A6A3; --faint:#6E827F;
+  --accent:#42BFB3; --accent-soft:#123330; --accent-ink:#8FDAD2; --on-accent:#06201E;
+  --amber:#D9A548; --amber-soft:#33280F;
+  --warn:#E4784F;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Familjen Grotesk","Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:contain;
+}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{
+  max-width:480px;margin:0 auto;
+  padding:calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  display:flex;flex-direction:column;gap:14px;
+}
+
+.lab{font-family:"Spline Sans Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;font-family:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.top h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.top .date{font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted)}
+
+.gauge{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 12px;box-shadow:var(--shadow)}
+.gauge-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
+.big{font-size:42px;font-weight:700;line-height:.95;letter-spacing:-.03em}
+.big .u{font-family:"Spline Sans Mono",monospace;font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:5px}
+.goal-line{text-align:right;font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted);line-height:1.5}
+.goal-line b{color:var(--ink);font-weight:600}
+.beaker{position:relative;height:34px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-2);overflow:hidden}
+.beaker-fill{position:absolute;inset:0 auto 0 0;background:var(--accent);opacity:.9;transition:width .45s cubic-bezier(.22,.7,.3,1)}
+.beaker-ticks{position:absolute;inset:0;display:flex}
+.tick{flex:1;border-right:1px solid var(--line-strong);opacity:.55}
+.tick:last-child{border-right:none}
+.tick.half{border-right-style:dotted}
+.beaker-scale{display:flex;justify-content:space-between;margin-top:5px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--faint)}
+
+.nudge{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:11px;background:var(--surface-2);border:1px solid var(--line);font-size:14px}
+.nudge.due{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.nudge .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.nudge.due .dot{background:var(--accent);animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.nudge.due .dot{animation:none}.beaker-fill{transition:none}}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.quick button{background:var(--accent);color:var(--on-accent);border-radius:11px;min-height:56px;font-weight:600;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:transform .08s ease}
+.quick button:active{transform:scale(.95)}
+.quick button span{font-family:"Spline Sans Mono",monospace;font-size:9px;letter-spacing:.06em;opacity:.75;font-weight:500}
+.freeform{display:flex;gap:8px}
+.freeform input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:11px;padding:0 14px;height:52px;color:var(--ink);font-size:17px;font-family:"Spline Sans Mono",monospace;font-variant-numeric:tabular-nums}
+.freeform input::placeholder{color:var(--faint);font-family:"Familjen Grotesk",sans-serif}
+.freeform button{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:11px;padding:0 20px;height:52px;font-weight:600;white-space:nowrap}
+
+.pee-btn{width:100%;min-height:58px;border-radius:12px;background:var(--amber-soft);border:1px solid var(--amber);color:var(--amber);font-weight:600;font-size:17px;display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .08s ease}
+.pee-btn:active{transform:scale(.98)}
+.pee-count{font-family:"Spline Sans Mono",monospace;font-size:13px;opacity:.8}
+.shades{display:flex;flex-direction:column;gap:8px}
+.shade-row{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.shade{height:44px;border-radius:9px;border:1px solid var(--line-strong);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:#3A2E12;font-weight:600}
+.shade[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:1px}
+.shade-hint{font-size:13px;color:var(--muted)}
+.shade-hint b{color:var(--ink);font-weight:600}
+
+.vit{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+.vit:last-child{border-bottom:none;padding-bottom:0}
+.vit-time{font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted);width:42px;flex:none}
+.vit-body{flex:1;min-width:0}
+.vit-name{font-weight:600;font-size:15px;line-height:1.25}
+.vit-dose{font-family:"Spline Sans Mono",monospace;font-size:11px;color:var(--faint)}
+.vit.done .vit-name,.vit.done .vit-dose{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px}
+.check{width:38px;height:38px;flex:none;border-radius:10px;border:1.5px solid var(--line-strong);background:var(--surface-2);display:flex;align-items:center;justify-content:center}
+.check[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.check svg{width:19px;height:19px;stroke:var(--faint);stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.check[aria-pressed="true"] svg{stroke:var(--on-accent)}
+.vit-late{color:var(--warn);font-family:"Spline Sans Mono",monospace;font-size:11px}
+
+.log{display:flex;flex-direction:column}
+.log-row{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid var(--line)}
+.log-row:last-child{border-bottom:none}
+.log-time{font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted);width:42px;flex:none}
+.log-mark{width:3px;height:20px;border-radius:2px;flex:none}
+.log-text{flex:1;font-size:14px}
+.log-text .amt{font-family:"Spline Sans Mono",monospace;font-weight:600}
+.log-del{width:30px;height:30px;flex:none;border-radius:8px;color:var(--faint);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center}
+.log-del:hover{background:var(--surface-2);color:var(--warn)}
+.empty{font-size:14px;color:var(--muted);padding:6px 0}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;align-items:end;height:78px}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
+.bar{width:100%;border-radius:4px 4px 2px 2px;background:var(--accent);min-height:3px;opacity:.75}
+.bar.today{opacity:1}
+.bar.miss{background:var(--line-strong)}
+.bar-lab{font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--faint)}
+
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:11px;overflow:hidden}
+.stat{background:var(--surface);padding:11px 13px}
+.stat-v{font-size:21px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.stat-v .u{font-family:"Spline Sans Mono",monospace;font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
+.stat-k{font-family:"Spline Sans Mono",monospace;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-top:2px}
+
+details{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+summary{padding:14px;font-weight:600;font-size:15px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:"Spline Sans Mono",monospace;color:var(--faint);font-size:18px}
+details[open] summary::after{content:"–"}
+.settings{padding:0 14px 14px;display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-family:"Spline Sans Mono",monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.field input,.field select{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px;color:var(--ink);font-size:15px;font-family:inherit;width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.vit-edit{display:grid;grid-template-columns:1fr 76px 62px 34px;gap:6px;align-items:center}
+.vit-edit input{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:8px 9px;color:var(--ink);font-size:14px;font-family:inherit;min-width:0;width:100%}
+.ghost{border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;font-weight:600;font-size:14px;background:var(--surface-2);text-align:center;width:100%}
+.ghost.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn-col{display:flex;flex-direction:column;gap:8px}
+.alarms{font-family:"Spline Sans Mono",monospace;font-size:13px;line-height:1.9;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;word-spacing:.3em}
+.note{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+.note b{color:var(--ink);font-weight:600}
+.preview{font-family:"Spline Sans Mono",monospace;font-size:11px;line-height:1.55;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px;max-height:190px;overflow:auto;white-space:pre;color:var(--muted)}
+.foot{font-family:"Spline Sans Mono",monospace;font-size:10px;letter-spacing:.06em;color:var(--faint);text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(180%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:var(--shadow);transition:transform .25s cubic-bezier(.22,.7,.3,1);z-index:50;max-width:90vw;text-align:center}
+.toast.on{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <h1>Водомер</h1>
+    <div class="date num" id="today-date">—</div>
+  </div>
+
+  <section class="gauge">
+    <div class="gauge-head">
+      <div class="big num"><span id="ml-total">0</span><span class="u">мл</span></div>
+      <div class="goal-line num">цель <b id="goal-txt">2500</b> мл<br><span id="goal-left">—</span></div>
+    </div>
+    <div class="beaker">
+      <div class="beaker-fill" id="fill" style="width:0%"></div>
+      <div class="beaker-ticks" id="ticks"></div>
+    </div>
+    <div class="beaker-scale" id="scale"></div>
+  </section>
+
+  <div class="nudge" id="nudge"><span class="dot"></span><span id="nudge-txt">—</span></div>
+
+  <section class="card">
+    <div class="lab">Записать воду</div>
+    <div class="quick" id="quick"></div>
+    <div class="freeform">
+      <input id="ml-input" type="number" inputmode="numeric" min="1" max="3000" step="10" placeholder="Своё количество, мл" aria-label="Количество воды в миллилитрах">
+      <button id="ml-add">Записать</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="lab">Мочеиспускание</div>
+    <button class="pee-btn" id="pee-btn">Отметить <span class="pee-count num" id="pee-count"></span></button>
+    <div class="shades" id="shade-block" hidden>
+      <div class="lab">Цвет — по шкале гидратации</div>
+      <div class="shade-row" id="shade-row"></div>
+      <div class="shade-hint" id="shade-hint">1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="lab">Витамины сегодня</div>
+    <div id="vit-list"></div>
+  </section>
+
+  <section class="card">
+    <div class="lab">Что было за день</div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card">
+    <div class="lab">Итог дня</div>
+    <div class="summary" id="summary"></div>
+    <div class="lab" style="margin-top:2px">Вода за 7 дней</div>
+    <div class="week" id="week"></div>
+  </section>
+
+  <details id="cfg-export">
+    <summary>Выгрузка для ChatGPT, Gemini и Claude</summary>
+    <div class="settings">
+      <div class="field">
+        <label for="e-period">Период</label>
+        <select id="e-period">
+          <option value="1">Сегодня</option>
+          <option value="7" selected>Последние 7 дней</option>
+          <option value="30">Последние 30 дней</option>
+          <option value="0">Всё, что есть</option>
+        </select>
+      </div>
+      <div class="preview num" id="e-preview">—</div>
+      <div class="btn-col">
+        <button class="ghost primary" id="e-copy">Скопировать текст для чата</button>
+        <button class="ghost" id="e-share">Отправить файлом</button>
+        <button class="ghost" id="e-csv">Скачать CSV</button>
+      </div>
+      <p class="note">Текст готов к вставке: цифры уже сведены по дням, единицы подписаны, план по витаминам приложен. Вставляйте в чат и спрашивайте, что хотите — сколько недобираю, есть ли связь между водой и походами, что поменять.</p>
+    </div>
+  </details>
+
+  <details id="cfg">
+    <summary>Настройки и напоминания</summary>
+    <div class="settings">
+
+      <div class="row2">
+        <div class="field"><label for="s-goal">Цель, мл</label><input id="s-goal" type="number" inputmode="numeric" min="500" max="6000" step="100"></div>
+        <div class="field"><label for="s-int">Интервал, мин</label><input id="s-int" type="number" inputmode="numeric" min="15" max="240" step="15"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="s-from">Пить с</label><input id="s-from" type="time"></div>
+        <div class="field"><label for="s-to">Пить до</label><input id="s-to" type="time"></div>
+      </div>
+      <div class="field">
+        <label for="s-quick">Быстрые кнопки, мл через запятую</label>
+        <input id="s-quick" type="text" inputmode="numeric" placeholder="200, 250, 350, 500">
+      </div>
+
+      <div class="field">
+        <label>Витамины — название, доза, время</label>
+        <div id="vit-edit-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button class="ghost" id="vit-add" style="margin-top:4px">+ Добавить витамин</button>
+      </div>
+
+      <div class="field">
+        <label>Будильники для «Часов» на айфоне</label>
+        <div class="alarms num" id="alarms">—</div>
+        <button class="ghost" id="copy-alarms">Скопировать времена</button>
+        <p class="note">Веб-приложение на iOS не умеет присылать пуши — это запрет Apple, обойти нельзя. Заведите эти времена будильниками в «Часах» с ежедневным повтором. Само приложение показывает вверху, когда подошёл срок.</p>
+      </div>
+
+      <div class="field">
+        <label>Резервная копия</label>
+        <div class="btn-col">
+          <button class="ghost" id="backup">Сохранить копию (JSON)</button>
+          <button class="ghost" id="restore-btn">Восстановить из копии</button>
+          <input id="restore-file" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p class="note"><b>Записи хранятся только в этом браузере.</b> Сервера нет — если очистить данные Safari или сменить телефон, история пропадёт. Раз в пару недель сохраняйте копию.</p>
+      </div>
+
+    </div>
+  </details>
+
+  <div class="foot" id="foot">данные хранятся на этом устройстве</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+var DAY_START = 4;
+var LS = "vodomer.v1";
+var SHADES = ["#F6F4DE","#F2EBB4","#EBDD84","#E2C755","#CC9E2E","#A56A12"];
+var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+
+var DEFAULTS = {
+  goal: 2500, interval: 90, from: "08:00", to: "22:00",
+  quick: [200,250,350,500],
+  vitamins: [
+    {id:"v1", time:"08:30", name:"Витамин D3", dose:"2000 МЕ", sample:true},
+    {id:"v2", time:"08:30", name:"Омега-3",    dose:"1 капсула", sample:true},
+    {id:"v3", time:"21:30", name:"Магний",     dose:"200 мг",  sample:true}
+  ]
+};
+
+var state = { settings: null, days: {} };
+var lastPeeId = null;
+
+/* ---------- утилиты ---------- */
+function pad(n){ return n < 10 ? "0" + n : "" + n; }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function dayKey(ts){
+  var d = new Date(ts);
+  d.setHours(d.getHours() - DAY_START);
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+function keyToDate(k){ var p = k.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function ruDate(k){ var d = keyToDate(k); return d.getDate() + " " + MONTHS[d.getMonth()]; }
+function hhmm(ts){ var d = new Date(ts); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+function mins(t){ var p = String(t||"0:0").split(":"); return (+p[0])*60 + (+p[1]); }
+function todayKey(){ return dayKey(Date.now()); }
+function dayEvents(k){
+  var d = state.days[k];
+  return d ? (d.events||[]).filter(function(e){ return !e.del; }) : [];
+}
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("on"); }, 2400);
+}
+function plural(n, a, b, c){
+  var m = n % 100;
+  if(m > 10 && m < 20) return c;
+  m = n % 10;
+  if(m === 1) return a;
+  if(m >= 2 && m <= 4) return b;
+  return c;
+}
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+/* ---------- хранение ---------- */
+function loadLocal(){
+  var raw = null, saved = null;
+  try { raw = localStorage.getItem(LS); } catch(e){}
+  if(raw){ try { saved = JSON.parse(raw); } catch(e){} }
+  state.settings = Object.assign({}, DEFAULTS, (saved && saved.settings) || {});
+  if(!Array.isArray(state.settings.vitamins)) state.settings.vitamins = DEFAULTS.vitamins.slice();
+  if(!Array.isArray(state.settings.quick) || !state.settings.quick.length) state.settings.quick = DEFAULTS.quick.slice();
+  state.days = (saved && saved.days) || {};
+}
+function saveLocal(){
+  try { localStorage.setItem(LS, JSON.stringify(state)); }
+  catch(e){ toast("Память браузера переполнена — сохраните копию"); }
+}
+function mergeDay(key, incoming){
+  var byId = {};
+  ((state.days[key] || {}).events || []).forEach(function(e){ byId[e.id] = e; });
+  (incoming.events || []).forEach(function(e){
+    var cur = byId[e.id];
+    if(!cur || (e.up||0) > (cur.up||0)) byId[e.id] = e;
+  });
+  var list = Object.keys(byId).map(function(k){ return byId[k]; });
+  list.sort(function(a,b){ return a.t - b.t; });
+  state.days[key] = { events: list };
+}
+
+/* ---------- события ---------- */
+function addEvent(ev){
+  var k = dayKey(ev.t);
+  if(!state.days[k]) state.days[k] = { events: [] };
+  ev.up = Date.now();
+  state.days[k].events.push(ev);
+  state.days[k].events.sort(function(a,b){ return a.t - b.t; });
+  saveLocal(); render();
+}
+function removeEvent(id, k){
+  var d = state.days[k]; if(!d) return;
+  d.events.forEach(function(e){ if(e.id === id){ e.del = 1; e.up = Date.now(); } });
+  saveLocal(); render();
+}
+function addWater(ml){
+  ml = Math.round(ml);
+  if(!(ml > 0)) return;
+  if(ml > 3000){ toast("Больше 3 литров за раз — вряд ли"); return; }
+  addEvent({ id: uid(), t: Date.now(), k: "w", ml: ml });
+  toast("+" + ml + " мл");
+}
+function addPee(){
+  var id = uid();
+  addEvent({ id: id, t: Date.now(), k: "p" });
+  lastPeeId = id;
+  var block = document.getElementById("shade-block");
+  block.hidden = false;
+  document.getElementById("shade-hint").innerHTML = "1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.";
+  clearTimeout(block._h);
+  block._h = setTimeout(function(){ block.hidden = true; lastPeeId = null; renderShades(); }, 25000);
+  renderShades();
+}
+function setShade(n){
+  if(!lastPeeId) return;
+  var k = todayKey(), d = state.days[k];
+  if(d) d.events.forEach(function(e){ if(e.id === lastPeeId){ e.shade = n; e.up = Date.now(); } });
+  saveLocal();
+  document.getElementById("shade-hint").innerHTML =
+    n <= 3 ? "<b>Норма.</b> Гидратация в порядке."
+  : n <= 5 ? "<b>Светлее должно быть.</b> Добавьте 300–500 мл в ближайший час."
+  : "<b>Тёмная.</b> Признак обезвоживания — пейте прямо сейчас.";
+  render();
+}
+function toggleVit(vid){
+  var k = todayKey();
+  var evs = dayEvents(k).filter(function(e){ return e.k === "v" && e.vid === vid; });
+  if(evs.length) removeEvent(evs[evs.length-1].id, k);
+  else addEvent({ id: uid(), t: Date.now(), k: "v", vid: vid });
+}
+
+/* ---------- расчёты ---------- */
+function dayStats(k){
+  var evs = dayEvents(k);
+  var ml = 0, pee = 0, shades = [], vits = {}, lastW = 0;
+  evs.forEach(function(e){
+    if(e.k === "w"){ ml += e.ml; if(e.t > lastW) lastW = e.t; }
+    else if(e.k === "p"){ pee++; if(e.shade) shades.push(e.shade); }
+    else if(e.k === "v"){ vits[e.vid] = true; }
+  });
+  return { key: k, ml: ml, pee: pee, shades: shades, vits: vits, lastW: lastW, evs: evs };
+}
+function recentKeys(n){
+  var out = [], now = Date.now();
+  for(var i = 0; i < n; i++) out.push(dayKey(now - i*86400000));
+  return out;
+}
+function periodKeys(days){
+  if(!days) return Object.keys(state.days).filter(function(k){ return dayEvents(k).length; }).sort();
+  return recentKeys(days).reverse();
+}
+
+/* ---------- отрисовка ---------- */
+function render(){
+  var k = todayKey(), s = dayStats(k), cfg = state.settings, now = new Date();
+  document.getElementById("today-date").textContent = now.getDate() + " " + MONTHS[now.getMonth()];
+  document.getElementById("ml-total").textContent = s.ml;
+  document.getElementById("goal-txt").textContent = cfg.goal;
+  var left = cfg.goal - s.ml;
+  document.getElementById("goal-left").textContent = left > 0 ? ("осталось " + left) : ("+" + (-left) + " сверх");
+  document.getElementById("fill").style.width = Math.min(100, s.ml / cfg.goal * 100) + "%";
+
+  var steps = Math.max(2, Math.round(cfg.goal / 250));
+  var ticks = document.getElementById("ticks");
+  if(ticks._n !== steps){
+    ticks._n = steps; ticks.innerHTML = "";
+    for(var i = 0; i < steps; i++){
+      var t = document.createElement("div");
+      t.className = "tick" + (i % 2 === 0 ? " half" : "");
+      ticks.appendChild(t);
+    }
+    var sc = document.getElementById("scale");
+    sc.innerHTML = "";
+    [0, Math.round(cfg.goal/2), cfg.goal].forEach(function(m){
+      var el = document.createElement("span");
+      el.className = "num";
+      el.textContent = m ? (m/1000).toFixed(m % 1000 ? 2 : 1) + " л" : "0";
+      sc.appendChild(el);
+    });
+  }
+
+  renderNudge(s);
+  renderQuick();
+  document.getElementById("pee-count").textContent = s.pee ? "· " + s.pee + " " + plural(s.pee,"раз","раза","раз") : "";
+  renderShades();
+  renderVits(s);
+  renderLog(k, s);
+  renderSummary(s);
+  renderWeek();
+  renderAlarms();
+  renderPreview();
+}
+
+function renderNudge(s){
+  var cfg = state.settings, el = document.getElementById("nudge"), txt = document.getElementById("nudge-txt");
+  var now = new Date(), nowM = now.getHours()*60 + now.getMinutes();
+  if(nowM < mins(cfg.from)){ el.className = "nudge"; txt.textContent = "Питьевое окно открывается в " + cfg.from; return; }
+  if(nowM > mins(cfg.to)){
+    el.className = "nudge";
+    txt.textContent = s.ml >= cfg.goal ? "День закрыт, цель взята" : "Питьевое окно закрыто — " + (cfg.goal - s.ml) + " мл не добрано";
+    return;
+  }
+  if(!s.lastW){ el.className = "nudge due"; txt.textContent = "Сегодня ещё ни глотка — начните со стакана"; return; }
+  var dueAt = s.lastW + cfg.interval*60000;
+  var diff = Math.round((dueAt - Date.now()) / 60000);
+  if(diff <= 0){
+    el.className = "nudge due";
+    txt.textContent = "Пора пить — прошло " + Math.round((Date.now()-s.lastW)/60000) + " мин с последнего раза";
+  } else {
+    el.className = "nudge";
+    txt.textContent = "Следующий приём в " + hhmm(dueAt) + " · через " + diff + " " + plural(diff,"минуту","минуты","минут");
+  }
+}
+
+function renderQuick(){
+  var box = document.getElementById("quick"), want = state.settings.quick.join(",");
+  if(box._sig === want) return;
+  box._sig = want; box.innerHTML = "";
+  state.settings.quick.slice(0,4).forEach(function(ml){
+    var b = document.createElement("button");
+    b.innerHTML = ml + "<span>МЛ</span>";
+    b.setAttribute("aria-label", "Записать " + ml + " миллилитров");
+    b.addEventListener("click", function(){ addWater(ml); });
+    box.appendChild(b);
+  });
+}
+
+function renderShades(){
+  var row = document.getElementById("shade-row");
+  if(!row.childElementCount){
+    SHADES.forEach(function(c, i){
+      var b = document.createElement("button");
+      b.className = "shade"; b.style.background = c; b.textContent = (i+1);
+      b.setAttribute("aria-label", "Оттенок " + (i+1) + " из 6");
+      b.addEventListener("click", function(){ setShade(i+1); });
+      row.appendChild(b);
+    });
+  }
+  var cur = 0;
+  if(lastPeeId) dayEvents(todayKey()).forEach(function(e){ if(e.id === lastPeeId && e.shade) cur = e.shade; });
+  Array.prototype.forEach.call(row.children, function(b, i){
+    b.setAttribute("aria-pressed", cur === i+1 ? "true" : "false");
+  });
+}
+
+function renderVits(s){
+  var box = document.getElementById("vit-list");
+  box.innerHTML = "";
+  var list = state.settings.vitamins.slice().sort(function(a,b){ return mins(a.time) - mins(b.time); });
+  if(!list.length){ box.innerHTML = '<div class="empty">Витамины не заведены — добавьте их в настройках ниже.</div>'; return; }
+  var now = new Date(), nowM = now.getHours()*60 + now.getMinutes();
+  list.forEach(function(v){
+    var done = !!s.vits[v.id];
+    var late = !done && nowM > mins(v.time) + 30;
+    var row = document.createElement("div");
+    row.className = "vit" + (done ? " done" : "");
+    row.innerHTML =
+      '<div class="vit-time num">' + v.time + '</div>' +
+      '<div class="vit-body"><div class="vit-name">' + esc(v.name) + (v.sample ? ' <span class="vit-dose">· пример</span>' : '') + '</div>' +
+      '<div class="vit-dose">' + esc(v.dose || "") + (late ? ' <span class="vit-late">просрочен</span>' : '') + '</div></div>';
+    var btn = document.createElement("button");
+    btn.className = "check";
+    btn.setAttribute("aria-pressed", done ? "true" : "false");
+    btn.setAttribute("aria-label", (done ? "Отменить приём: " : "Отметить приём: ") + v.name);
+    btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4,12.5 9.5,18 20,6.5"></polyline></svg>';
+    btn.addEventListener("click", function(){ toggleVit(v.id); });
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+}
+
+function renderLog(k, s){
+  var box = document.getElementById("log");
+  box.innerHTML = "";
+  if(!s.evs.length){
+    box.innerHTML = '<div class="empty">Пока пусто. Нажмите кнопку с количеством выше — время запишется само.</div>';
+    return;
+  }
+  var vitName = {};
+  state.settings.vitamins.forEach(function(v){ vitName[v.id] = v.name; });
+  s.evs.slice().reverse().forEach(function(e){
+    var row = document.createElement("div");
+    row.className = "log-row";
+    var color = e.k === "w" ? "var(--accent)" : e.k === "p" ? "var(--amber)" : "var(--line-strong)";
+    var text = e.k === "w" ? '<span class="amt num">' + e.ml + '</span> мл воды'
+             : e.k === "p" ? ("Мочеиспускание" + (e.shade ? ' · оттенок <span class="amt num">' + e.shade + '</span>' : ""))
+             : (esc(vitName[e.vid] || "витамин") + " принят");
+    row.innerHTML = '<div class="log-time num">' + hhmm(e.t) + '</div>' +
+                    '<div class="log-mark" style="background:' + color + '"></div>' +
+                    '<div class="log-text">' + text + '</div>';
+    var del = document.createElement("button");
+    del.className = "log-del"; del.textContent = "×";
+    del.setAttribute("aria-label", "Удалить запись");
+    del.addEventListener("click", function(){ removeEvent(e.id, k); });
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+function renderSummary(s){
+  var box = document.getElementById("summary"), cfg = state.settings;
+  var vitDone = Object.keys(s.vits).length;
+  var avgShade = s.shades.length ? s.shades.reduce(function(a,b){return a+b;},0) / s.shades.length : 0;
+  var peeEvs = s.evs.filter(function(e){ return e.k === "p"; });
+  var gap = "—";
+  if(peeEvs.length > 1){
+    var span = peeEvs[peeEvs.length-1].t - peeEvs[0].t;
+    gap = Math.round(span / (peeEvs.length-1) / 60000) + '<span class="u">мин</span>';
+  }
+  var cells = [
+    { v: Math.round(s.ml / cfg.goal * 100) + '<span class="u">%</span>', k: "цели по воде" },
+    { v: s.pee + '<span class="u">' + plural(s.pee,"раз","раза","раз") + '</span>', k: "сходил" },
+    { v: gap, k: "средний интервал" },
+    { v: vitDone + "/" + cfg.vitamins.length, k: "витамины" }
+  ];
+  if(avgShade) cells.push({ v: avgShade.toFixed(1), k: "средний оттенок" });
+  if(s.lastW) cells.push({ v: hhmm(s.lastW), k: "последний глоток" });
+  box.innerHTML = "";
+  cells.forEach(function(c){
+    var d = document.createElement("div");
+    d.className = "stat";
+    d.innerHTML = '<div class="stat-v num">' + c.v + '</div><div class="stat-k">' + c.k + '</div>';
+    box.appendChild(d);
+  });
+}
+
+function renderWeek(){
+  var box = document.getElementById("week");
+  box.innerHTML = "";
+  var wd = ["вс","пн","вт","ср","чт","пт","сб"];
+  var keys = recentKeys(7).reverse();
+  var vals = keys.map(function(k){ return dayStats(k).ml; });
+  var max = Math.max(state.settings.goal, Math.max.apply(null, vals));
+  keys.forEach(function(k, i){
+    var ml = vals[i], isToday = (i === 6);
+    var h = max ? Math.max(3, Math.round(ml / max * 56)) : 3;
+    var d = keyToDate(k);
+    var col = document.createElement("div");
+    col.className = "bar-col";
+    col.innerHTML = '<div class="bar' + (isToday ? " today" : "") + (ml < state.settings.goal*0.6 ? " miss" : "") +
+                    '" style="height:' + h + 'px" title="' + ml + ' мл"></div>' +
+                    '<div class="bar-lab">' + (isToday ? "сег" : wd[d.getDay()]) + '</div>';
+    box.appendChild(col);
+  });
+}
+
+function alarmTimes(){
+  var cfg = state.settings, out = [];
+  for(var m = mins(cfg.from); m <= mins(cfg.to); m += cfg.interval) out.push(pad(Math.floor(m/60)) + ":" + pad(m%60));
+  cfg.vitamins.forEach(function(v){ if(out.indexOf(v.time) < 0) out.push(v.time); });
+  out.sort();
+  return out;
+}
+function renderAlarms(){ document.getElementById("alarms").textContent = alarmTimes().join("   "); }
+
+/* ---------- настройки ---------- */
+function fillSettings(){
+  var c = state.settings;
+  document.getElementById("s-goal").value = c.goal;
+  document.getElementById("s-int").value = c.interval;
+  document.getElementById("s-from").value = c.from;
+  document.getElementById("s-to").value = c.to;
+  document.getElementById("s-quick").value = c.quick.join(", ");
+  renderVitEditor();
+}
+function renderVitEditor(){
+  var box = document.getElementById("vit-edit-list");
+  box.innerHTML = "";
+  state.settings.vitamins.forEach(function(v, idx){
+    var row = document.createElement("div");
+    row.className = "vit-edit";
+    row.innerHTML = '<input type="text" value="' + esc(v.name) + '" aria-label="Название" placeholder="Название">' +
+                    '<input type="text" value="' + esc(v.dose||"") + '" aria-label="Доза" placeholder="Доза">' +
+                    '<input type="time" value="' + v.time + '" aria-label="Время">';
+    var inputs = row.querySelectorAll("input");
+    inputs[0].addEventListener("input", function(){ v.name = this.value; v.sample = false; touchSettings(); });
+    inputs[1].addEventListener("input", function(){ v.dose = this.value; v.sample = false; touchSettings(); });
+    inputs[2].addEventListener("input", function(){ v.time = this.value || "09:00"; touchSettings(); });
+    var del = document.createElement("button");
+    del.className = "log-del"; del.textContent = "×";
+    del.setAttribute("aria-label", "Убрать витамин");
+    del.addEventListener("click", function(){
+      state.settings.vitamins.splice(idx,1); saveLocal(); renderVitEditor(); render();
+    });
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+function touchSettings(){ saveLocal(); render(); }
+
+/* ---------- выгрузка ---------- */
+function periodLabel(keys){
+  if(!keys.length) return "нет записей";
+  if(keys.length === 1) return ruDate(keys[0]) + " " + keyToDate(keys[0]).getFullYear();
+  return ruDate(keys[0]) + " — " + ruDate(keys[keys.length-1]) + " " + keyToDate(keys[keys.length-1]).getFullYear();
+}
+function buildReport(days){
+  var cfg = state.settings;
+  var keys = periodKeys(days).filter(function(k){ return dayEvents(k).length; });
+  var vitName = {};
+  cfg.vitamins.forEach(function(v){ vitName[v.id] = v.name; });
+
+  var L = [];
+  L.push("ДНЕВНИК ГИДРАТАЦИИ И ВИТАМИНОВ");
+  L.push("Период: " + periodLabel(keys) + " (" + keys.length + " " + plural(keys.length,"день","дня","дней") + " с записями)");
+  L.push("Цель по воде: " + cfg.goal + " мл в сутки. Питьевое окно " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин.");
+  L.push("Сутки считаются с 04:00 до 04:00.");
+  L.push("План витаминов: " + (cfg.vitamins.length
+    ? cfg.vitamins.map(function(v){ return v.name + (v.dose ? " " + v.dose : "") + " в " + v.time; }).join("; ")
+    : "не заведён"));
+  L.push("Оттенок мочи — шкала 1–6: 1-3 норма, 4-5 недостаток воды, 6 обезвоживание.");
+  L.push("");
+
+  if(!keys.length){ L.push("Записей за период нет."); return L.join("\n"); }
+
+  L.push("ПО ДНЯМ");
+  L.push("дата        вода_мл  %цели  мочеисп  ср_оттенок  витамины  первый  последний");
+  var tot = { ml:0, pee:0, sh:[], vd:0, vt:0 };
+  keys.forEach(function(k){
+    var s = dayStats(k);
+    var w = s.evs.filter(function(e){ return e.k === "w"; });
+    var avg = s.shades.length ? (s.shades.reduce(function(a,b){return a+b;},0)/s.shades.length) : 0;
+    var vd = Object.keys(s.vits).length;
+    tot.ml += s.ml; tot.pee += s.pee; tot.vd += vd; tot.vt += cfg.vitamins.length;
+    s.shades.forEach(function(x){ tot.sh.push(x); });
+    L.push(
+      k + "  " +
+      String(s.ml).padStart(7) + "  " +
+      String(Math.round(s.ml/cfg.goal*100)).padStart(5) + "  " +
+      String(s.pee).padStart(7) + "  " +
+      (avg ? avg.toFixed(1) : "—").padStart(10) + "  " +
+      (vd + "/" + cfg.vitamins.length).padStart(8) + "  " +
+      (w.length ? hhmm(w[0].t) : "—").padStart(6) + "  " +
+      (w.length ? hhmm(w[w.length-1].t) : "—").padStart(9)
+    );
+  });
+  L.push("");
+  var n = keys.length;
+  var avgSh = tot.sh.length ? (tot.sh.reduce(function(a,b){return a+b;},0)/tot.sh.length) : 0;
+  L.push("СРЕДНЕЕ ЗА ПЕРИОД");
+  L.push("вода: " + Math.round(tot.ml/n) + " мл в сутки (" + Math.round(tot.ml/n/cfg.goal*100) + "% цели)");
+  L.push("мочеиспусканий: " + (tot.pee/n).toFixed(1) + " в сутки" + (tot.pee ? "" : " (не отмечались)"));
+  L.push("средний оттенок: " + (avgSh ? avgSh.toFixed(1) + " из 6" : "не отмечался"));
+  L.push("витамины приняты: " + (tot.vt ? Math.round(tot.vd/tot.vt*100) : 0) + "% от плана");
+  L.push("");
+
+  var detail = keys.slice(-3);
+  L.push("ПОДРОБНЫЙ ЛОГ ЗА ПОСЛЕДНИЕ " + detail.length + " " + plural(detail.length,"ДЕНЬ","ДНЯ","ДНЕЙ"));
+  detail.forEach(function(k){
+    L.push("");
+    L.push(k + " (" + ruDate(k) + ")");
+    dayEvents(k).forEach(function(e){
+      L.push("  " + hhmm(e.t) + "  " + (
+        e.k === "w" ? "вода " + e.ml + " мл"
+      : e.k === "p" ? "мочеиспускание" + (e.shade ? ", оттенок " + e.shade : "")
+      : "витамин: " + (vitName[e.vid] || e.vid)
+      ));
+    });
+  });
+  return L.join("\n");
+}
+function buildCsv(days){
+  var vitName = {};
+  state.settings.vitamins.forEach(function(v){ vitName[v.id] = v.name; });
+  var rows = ["дата,время,тип,мл,оттенок,витамин"];
+  periodKeys(days).forEach(function(k){
+    dayEvents(k).forEach(function(e){
+      rows.push([k, hhmm(e.t),
+        e.k === "w" ? "вода" : e.k === "p" ? "мочеиспускание" : "витамин",
+        e.k === "w" ? e.ml : "", e.shade || "",
+        e.vid ? (vitName[e.vid] || e.vid) : ""].join(","));
+    });
+  });
+  return "﻿" + rows.join("\n");
+}
+function currentPeriod(){ return +document.getElementById("e-period").value; }
+function renderPreview(){
+  var el = document.getElementById("e-preview");
+  if(!el) return;
+  var txt = buildReport(currentPeriod());
+  el.textContent = txt.length > 900 ? txt.slice(0, 900) + "\n…" : txt;
+}
+function saveFile(name, text, mime){
+  var blob = new Blob([text], { type: (mime || "text/plain") + ";charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name; a.style.display = "none";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+function shareFile(name, text, mime){
+  var file;
+  try { file = new File([text], name, { type: (mime || "text/plain") + ";charset=utf-8" }); } catch(e){}
+  if(file && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: "Водомер" }).catch(function(){});
+    return;
+  }
+  saveFile(name, text, mime);
+  toast("Файл сохранён в «Загрузки»");
+}
+function copyText(txt, ok){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ toast(ok); }, function(){ fallbackCopy(txt, ok); });
+  } else fallbackCopy(txt, ok);
+}
+function fallbackCopy(txt, ok){
+  var ta = document.createElement("textarea");
+  ta.value = txt; ta.setAttribute("readonly",""); ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, txt.length);
+  var done = false;
+  try { done = document.execCommand("copy"); } catch(e){}
+  ta.remove();
+  toast(done ? ok : "Скопировать не вышло — выгрузите файлом");
+}
+
+/* ---------- запуск ---------- */
+loadLocal();
+fillSettings();
+render();
+
+setInterval(function(){ renderNudge(dayStats(todayKey())); }, 30000);
+document.addEventListener("visibilitychange", function(){ if(!document.hidden) render(); });
+
+document.getElementById("ml-add").addEventListener("click", function(){
+  var i = document.getElementById("ml-input");
+  addWater(+i.value); i.value = ""; i.blur();
+});
+document.getElementById("ml-input").addEventListener("keydown", function(e){
+  if(e.key === "Enter"){ addWater(+this.value); this.value = ""; this.blur(); }
+});
+document.getElementById("pee-btn").addEventListener("click", addPee);
+
+document.getElementById("s-goal").addEventListener("change", function(){ state.settings.goal = Math.max(500, +this.value || 2500); touchSettings(); });
+document.getElementById("s-int").addEventListener("change", function(){ state.settings.interval = Math.max(15, +this.value || 90); touchSettings(); });
+document.getElementById("s-from").addEventListener("change", function(){ state.settings.from = this.value || "08:00"; touchSettings(); });
+document.getElementById("s-to").addEventListener("change", function(){ state.settings.to = this.value || "22:00"; touchSettings(); });
+document.getElementById("s-quick").addEventListener("change", function(){
+  var v = this.value.split(",").map(function(x){ return Math.round(+x); }).filter(function(x){ return x > 0 && x <= 3000; });
+  if(v.length) { state.settings.quick = v.slice(0,4); touchSettings(); }
+  this.value = state.settings.quick.join(", ");
+});
+document.getElementById("vit-add").addEventListener("click", function(){
+  state.settings.vitamins.push({ id: uid(), time: "09:00", name: "Новый витамин", dose: "" });
+  saveLocal(); renderVitEditor(); render();
+});
+document.getElementById("copy-alarms").addEventListener("click", function(){
+  copyText(alarmTimes().join(", "), "Времена скопированы");
+});
+
+document.getElementById("e-period").addEventListener("change", renderPreview);
+document.getElementById("e-copy").addEventListener("click", function(){
+  copyText(buildReport(currentPeriod()), "Скопировано — вставляйте в чат");
+});
+document.getElementById("e-share").addEventListener("click", function(){
+  shareFile("vodomer-" + todayKey() + ".txt", buildReport(currentPeriod()), "text/plain");
+});
+document.getElementById("e-csv").addEventListener("click", function(){
+  saveFile("vodomer-" + todayKey() + ".csv", buildCsv(currentPeriod()), "text/csv");
+  toast("CSV сохранён");
+});
+
+document.getElementById("backup").addEventListener("click", function(){
+  shareFile("vodomer-backup-" + todayKey() + ".json", JSON.stringify(state), "application/json");
+});
+document.getElementById("restore-btn").addEventListener("click", function(){
+  document.getElementById("restore-file").click();
+});
+document.getElementById("restore-file").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var data;
+    try { data = JSON.parse(r.result); } catch(e){ toast("Это не файл копии"); return; }
+    if(!data || !data.days){ toast("Это не файл копии"); return; }
+    var added = 0;
+    Object.keys(data.days).forEach(function(k){
+      var before = dayEvents(k).length;
+      mergeDay(k, data.days[k]);
+      added += dayEvents(k).length - before;
+    });
+    if(data.settings) state.settings = Object.assign({}, DEFAULTS, data.settings);
+    saveLocal(); fillSettings(); render();
+    toast("Восстановлено, добавлено записей: " + added);
+  };
+  r.readAsText(f);
+  this.value = "";
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+})();
+</script>
+</body>
+</html>
