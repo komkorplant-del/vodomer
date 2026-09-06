@@ -83,7 +83,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .goal-line{text-align:right;font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--muted);line-height:1.5}
 .goal-line b{color:var(--ink);font-weight:600}
 .beaker{position:relative;height:34px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-2);overflow:hidden}
-.beaker-fill{position:absolute;inset:0 auto 0 0;background:var(--accent);opacity:.9;transition:width .45s cubic-bezier(.22,.7,.3,1)}
+.beaker-fill{position:absolute;top:0;bottom:0;left:0;width:0;background:var(--accent);opacity:.9;transition:width .45s cubic-bezier(.22,.7,.3,1),left .45s cubic-bezier(.22,.7,.3,1)}
+.beaker-fill.tea{opacity:.42}
+.legend{display:flex;gap:14px;align-items:center;margin-top:6px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--faint)}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend b{color:var(--muted);font-weight:600}
+.legend i{width:9px;height:9px;border-radius:3px;background:var(--accent);display:inline-block}
+.legend i.tea{opacity:.42}
 .beaker-ticks{position:absolute;inset:0;display:flex}
 .tick{flex:1;border-right:1px solid var(--line-strong);opacity:.55}
 .tick:last-child{border-right:none}
@@ -103,6 +109,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .quick.six{grid-template-columns:repeat(3,1fr)}
 .quick button{background:var(--accent);color:var(--on-accent);border-radius:11px;min-height:56px;font-weight:600;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:transform .08s ease}
 .quick button:active{transform:scale(.95)}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line-strong);border-radius:11px;overflow:hidden;background:var(--surface-2)}
+.seg button{padding:11px 8px;font-weight:600;font-size:15px;color:var(--muted);transition:background .15s ease,color .15s ease}
+.seg button + button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 .quick button span{font-family:"Spline Sans Mono",monospace;font-size:9px;letter-spacing:.06em;opacity:.75;font-weight:500}
 .freeform{display:flex;gap:8px}
 .freeform input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:11px;padding:0 14px;height:52px;color:var(--ink);font-size:17px;font-family:"Spline Sans Mono",monospace;font-variant-numeric:tabular-nums}
@@ -196,15 +206,21 @@ details[open] summary::after{content:"–"}
     </div>
     <div class="beaker">
       <div class="beaker-fill" id="fill" style="width:0%"></div>
+      <div class="beaker-fill tea" id="fill-tea"></div>
       <div class="beaker-ticks" id="ticks"></div>
     </div>
     <div class="beaker-scale" id="scale"></div>
+    <div class="legend" id="legend" hidden><span><i></i>вода <b id="lg-w">0</b></span><span><i class="tea"></i>чай <b id="lg-t">0</b></span></div>
   </section>
 
   <div class="nudge" id="nudge"><span class="dot"></span><span id="nudge-txt">—</span></div>
 
   <section class="card">
-    <div class="lab">Записать воду</div>
+    <div class="lab" id="drink-lab">Записать воду</div>
+    <div class="seg" id="drink-seg">
+      <button type="button" data-d="w" aria-pressed="true">Вода</button>
+      <button type="button" data-d="t" aria-pressed="false">Чай</button>
+    </div>
     <div class="quick" id="quick"></div>
     <div class="freeform">
       <input id="ml-input" type="number" inputmode="numeric" min="1" max="3000" step="10" placeholder="Своё количество, мл" aria-label="Количество воды в миллилитрах">
@@ -285,10 +301,21 @@ details[open] summary::after{content:"–"}
       </div>
 
       <div class="field">
-        <label>Будильники для «Часов» на айфоне</label>
+        <label>Уведомления</label>
+        <div class="nudge" id="push-state"><span class="dot"></span><span id="push-txt">Проверяю…</span></div>
+        <button class="ghost primary" id="push-on" hidden>Включить уведомления</button>
+        <div id="push-key-box" hidden>
+          <p class="note" style="margin:8px 0">Готово. Осталось один раз передать этот код — уведомления начнут приходить по расписанию.</p>
+          <button class="ghost" id="push-copy">Скопировать код подписки</button>
+        </div>
+        <p class="note" id="push-note"></p>
+      </div>
+
+      <div class="field">
+        <label>Запасной вариант: будильники в «Часах»</label>
         <div class="alarms num" id="alarms">—</div>
         <button class="ghost" id="copy-alarms">Скопировать времена</button>
-        <p class="note">Веб-приложение на iOS не умеет присылать пуши — это запрет Apple, обойти нельзя. Заведите эти времена будильниками в «Часах» с ежедневным повтором. Само приложение показывает вверху, когда подошёл срок.</p>
+        <p class="note">Если уведомления почему-то не дойдут — заведите эти времена будильниками с ежедневным повтором.</p>
       </div>
 
       <div class="field">
@@ -332,6 +359,8 @@ var DEFAULTS = {
 
 var state = { settings: null, days: {} };
 var lastPeeId = null;
+var drink = "w";   // что записываем сейчас; при запуске всегда вода
+var DRINKS = { w: { gen: "воды", verb: "Записать воду" }, t: { gen: "чая", verb: "Записать чай" } };
 
 /* ---------- утилиты ---------- */
 function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -425,8 +454,8 @@ function addWater(ml){
   ml = Math.round(ml);
   if(!(ml > 0)) return;
   if(ml > 3000){ toast("Больше 3 литров за раз — вряд ли"); return; }
-  addEvent({ id: uid(), t: Date.now(), k: "w", ml: ml });
-  toast("+" + ml + " мл");
+  addEvent({ id: uid(), t: Date.now(), k: "w", ml: ml, d: drink });
+  toast("+" + ml + " мл · " + DRINKS[drink].gen);
 }
 function addPee(){
   var id = uid();
@@ -464,13 +493,17 @@ function toggleVit(vid){
 /* ---------- расчёты ---------- */
 function dayStats(k){
   var evs = dayEvents(k);
-  var ml = 0, pee = 0, shades = [], vits = {}, lastW = 0;
+  var ml = 0, water = 0, tea = 0, pee = 0, shades = [], vits = {}, lastW = 0;
   evs.forEach(function(e){
-    if(e.k === "w"){ ml += e.ml; if(e.t > lastW) lastW = e.t; }
+    if(e.k === "w"){
+      ml += e.ml;
+      if(e.d === "t") tea += e.ml; else water += e.ml;   // записи без пометки — вода
+      if(e.t > lastW) lastW = e.t;
+    }
     else if(e.k === "p"){ pee++; if(e.shade) shades.push(e.shade); }
     else if(e.k === "v"){ vits[e.vid] = true; }
   });
-  return { key: k, ml: ml, pee: pee, shades: shades, vits: vits, lastW: lastW, evs: evs };
+  return { key: k, ml: ml, water: water, tea: tea, pee: pee, shades: shades, vits: vits, lastW: lastW, evs: evs };
 }
 function recentKeys(n){
   var out = [], now = Date.now();
@@ -490,7 +523,14 @@ function render(){
   document.getElementById("goal-txt").textContent = cfg.goal;
   var left = cfg.goal - s.ml;
   document.getElementById("goal-left").textContent = left > 0 ? ("осталось " + left) : ("+" + (-left) + " сверх");
-  document.getElementById("fill").style.width = Math.min(100, s.ml / cfg.goal * 100) + "%";
+  var pctW = Math.min(100, s.water / cfg.goal * 100);
+  var pctT = Math.min(100 - pctW, s.tea / cfg.goal * 100);
+  document.getElementById("fill").style.width = pctW + "%";
+  var ft = document.getElementById("fill-tea");
+  ft.style.left = pctW + "%"; ft.style.width = pctT + "%";
+  var lg = document.getElementById("legend");
+  lg.hidden = !s.tea;
+  if(s.tea){ document.getElementById("lg-w").textContent = s.water; document.getElementById("lg-t").textContent = s.tea; }
 
   var steps = Math.max(2, Math.round(cfg.goal / 250));
   var ticks = document.getElementById("ticks");
@@ -618,7 +658,7 @@ function renderLog(k, s){
     var row = document.createElement("div");
     row.className = "log-row";
     var color = e.k === "w" ? "var(--accent)" : e.k === "p" ? "var(--amber)" : "var(--line-strong)";
-    var text = e.k === "w" ? '<span class="amt num">' + e.ml + '</span> мл воды'
+    var text = e.k === "w" ? '<span class="amt num">' + e.ml + '</span> мл ' + DRINKS[e.d === "t" ? "t" : "w"].gen
              : e.k === "p" ? ("Мочеиспускание" + (e.shade ? ' · оттенок <span class="amt num">' + e.shade + '</span>' : ""))
              : (esc(vitName[e.vid] || e.vn || "витамин") + " принят");
     row.innerHTML = '<div class="log-time num">' + hhmm(e.t) + '</div>' +
@@ -649,6 +689,7 @@ function renderSummary(s){
     { v: gap, k: "средний интервал" },
     { v: vitDone + "/" + cfg.vitamins.length, k: "витамины" }
   ];
+  if(s.tea) cells.push({ v: s.water + '<span class="u">мл</span>', k: "из них чистой воды" });
   if(avgShade) cells.push({ v: avgShade.toFixed(1), k: "средний оттенок" });
   if(s.lastW) cells.push({ v: hhmm(s.lastW), k: "последний глоток" });
   box.innerHTML = "";
@@ -739,7 +780,7 @@ function buildReport(days){
   var L = [];
   L.push("ДНЕВНИК ГИДРАТАЦИИ И ВИТАМИНОВ");
   L.push("Период: " + periodLabel(keys) + " (" + keys.length + " " + plural(keys.length,"день","дня","дней") + " с записями)");
-  L.push("Цель по воде: " + cfg.goal + " мл в сутки. Основной приём " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин; после " + cfg.to + " вода тоже записывается.");
+  L.push("Цель по жидкости: " + cfg.goal + " мл в сутки. Основной приём " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин; после " + cfg.to + " вода тоже записывается.");
   L.push("Сутки считаются с 04:00 до 04:00.");
   L.push("План витаминов: " + (cfg.vitamins.length
     ? cfg.vitamins.map(function(v){ return v.name + (v.dose ? " " + v.dose : "") + " в " + v.time; }).join("; ")
@@ -749,19 +790,21 @@ function buildReport(days){
 
   if(!keys.length){ L.push("Записей за период нет."); return L.join("\n"); }
 
-  L.push("ПО ДНЯМ");
-  L.push("дата        вода_мл  %цели  мочеисп  ср_оттенок  витамины  первый  последний");
-  var tot = { ml:0, pee:0, sh:[], vd:0, vt:0 };
+  L.push("ПО ДНЯМ (жидкость = вода + чай; цель считается по всей жидкости)");
+  L.push("дата        жидк_мл  вода_мл  чай_мл  %цели  мочеисп  ср_оттенок  витамины  первый  последний");
+  var tot = { ml:0, water:0, tea:0, pee:0, sh:[], vd:0, vt:0 };
   keys.forEach(function(k){
     var s = dayStats(k);
     var w = s.evs.filter(function(e){ return e.k === "w"; });
     var avg = s.shades.length ? (s.shades.reduce(function(a,b){return a+b;},0)/s.shades.length) : 0;
     var vd = Object.keys(s.vits).length;
-    tot.ml += s.ml; tot.pee += s.pee; tot.vd += vd; tot.vt += cfg.vitamins.length;
+    tot.ml += s.ml; tot.water += s.water; tot.tea += s.tea; tot.pee += s.pee; tot.vd += vd; tot.vt += cfg.vitamins.length;
     s.shades.forEach(function(x){ tot.sh.push(x); });
     L.push(
       k + "  " +
       String(s.ml).padStart(7) + "  " +
+      String(s.water).padStart(7) + "  " +
+      String(s.tea).padStart(6) + "  " +
       String(Math.round(s.ml/cfg.goal*100)).padStart(5) + "  " +
       String(s.pee).padStart(7) + "  " +
       (avg ? avg.toFixed(1) : "—").padStart(10) + "  " +
@@ -774,7 +817,8 @@ function buildReport(days){
   var n = keys.length;
   var avgSh = tot.sh.length ? (tot.sh.reduce(function(a,b){return a+b;},0)/tot.sh.length) : 0;
   L.push("СРЕДНЕЕ ЗА ПЕРИОД");
-  L.push("вода: " + Math.round(tot.ml/n) + " мл в сутки (" + Math.round(tot.ml/n/cfg.goal*100) + "% цели)");
+  L.push("жидкость: " + Math.round(tot.ml/n) + " мл в сутки (" + Math.round(tot.ml/n/cfg.goal*100) + "% цели)");
+  L.push("из них чистая вода: " + Math.round(tot.water/n) + " мл, чай: " + Math.round(tot.tea/n) + " мл");
   L.push("мочеиспусканий: " + (tot.pee/n).toFixed(1) + " в сутки" + (tot.pee ? "" : " (не отмечались)"));
   L.push("средний оттенок: " + (avgSh ? avgSh.toFixed(1) + " из 6" : "не отмечался"));
   L.push("витамины приняты: " + (tot.vt ? Math.round(tot.vd/tot.vt*100) : 0) + "% от плана");
@@ -788,7 +832,7 @@ function buildReport(days){
     L.push(k + " (" + ruDate(k) + ")");
     dayEvents(k).forEach(function(e){
       L.push("  " + hhmm(e.t) + "  " + (
-        e.k === "w" ? "вода " + e.ml + " мл"
+        e.k === "w" ? (e.d === "t" ? "чай " : "вода ") + e.ml + " мл"
       : e.k === "p" ? "мочеиспускание" + (e.shade ? ", оттенок " + e.shade : "")
       : "витамин: " + (vitName[e.vid] || e.vn || e.vid)
       ));
@@ -803,7 +847,7 @@ function buildCsv(days){
   periodKeys(days).forEach(function(k){
     dayEvents(k).forEach(function(e){
       rows.push([k, hhmm(e.t),
-        e.k === "w" ? "вода" : e.k === "p" ? "мочеиспускание" : "витамин",
+        e.k === "w" ? (e.d === "t" ? "чай" : "вода") : e.k === "p" ? "мочеиспускание" : "витамин",
         e.k === "w" ? e.ml : "", e.shade || "",
         e.vid ? (vitName[e.vid] || e.vn || e.vid) : ""].join(","));
     });
@@ -867,6 +911,18 @@ document.getElementById("ml-input").addEventListener("keydown", function(e){
 });
 document.getElementById("pee-btn").addEventListener("click", addPee);
 
+Array.prototype.forEach.call(document.querySelectorAll("#drink-seg button"), function(b){
+  b.addEventListener("click", function(){
+    drink = b.getAttribute("data-d");
+    Array.prototype.forEach.call(document.querySelectorAll("#drink-seg button"), function(x){
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    document.getElementById("drink-lab").textContent = DRINKS[drink].verb;
+    document.getElementById("ml-add").textContent = "Записать";
+    document.getElementById("ml-input").placeholder = "Своё количество, мл";
+  });
+});
+
 document.getElementById("s-goal").addEventListener("change", function(){ state.settings.goal = Math.max(500, +this.value || 2500); touchSettings(); });
 document.getElementById("s-int").addEventListener("change", function(){ state.settings.interval = Math.max(15, +this.value || 90); touchSettings(); });
 document.getElementById("s-from").addEventListener("change", function(){ state.settings.from = this.value || "08:00"; touchSettings(); });
@@ -924,6 +980,78 @@ document.getElementById("restore-file").addEventListener("change", function(){
   this.value = "";
 });
 
+/* ---------- уведомления ---------- */
+var VAPID_PUBLIC = "BCWGRRYNEpjHODmqgadbCu6X_3tlVFOeQfecqc0XH4KRC2CfGLMmdCa3vn5V7X2kGyu4bpJIrqR80S9eJGSDtaM";
+
+function b64ToBytes(b64){
+  var pad = "=".repeat((4 - b64.length % 4) % 4);
+  var raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  var out = new Uint8Array(raw.length);
+  for(var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+function isStandalone(){
+  return window.navigator.standalone === true ||
+         (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+}
+function setPushState(text, ok, showBtn, note){
+  var box = document.getElementById("push-state");
+  box.className = "nudge" + (ok ? " due" : "");
+  document.getElementById("push-txt").textContent = text;
+  document.getElementById("push-on").hidden = !showBtn;
+  document.getElementById("push-note").textContent = note || "";
+}
+function refreshPushUi(){
+  if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)){
+    setPushState("Этот браузер не умеет уведомления", false, false,
+      "Откройте приложение с домашнего экрана айфона — там они работают.");
+    return;
+  }
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(ios && !isStandalone()){
+    setPushState("Сначала добавьте на домашний экран", false, false,
+      "iOS разрешает уведомления только приложениям с домашнего экрана: «Поделиться» → «На экран «Домой»», затем откройте с иконки и вернитесь сюда.");
+    return;
+  }
+  if(Notification.permission === "denied"){
+    setPushState("Уведомления запрещены", false, false,
+      "Разрешение отклонено. Настройки → Водомер → Уведомления — включить, затем перезапустить приложение.");
+    return;
+  }
+  navigator.serviceWorker.getRegistration().then(function(reg){
+    if(!reg){ setPushState("Приложение ещё готовится", false, false, "Перезагрузите страницу."); return; }
+    return reg.pushManager.getSubscription().then(function(sub){
+      if(sub){
+        setPushState("Уведомления включены", true, false,
+          "Приходят по расписанию питья и по времени витаминов.");
+        document.getElementById("push-key-box").hidden = false;
+        pushSub = sub;
+      } else {
+        setPushState("Уведомления выключены", false, true, "");
+        document.getElementById("push-key-box").hidden = true;
+      }
+    });
+  }).catch(function(){});
+}
+var pushSub = null;
+function enablePush(){
+  Notification.requestPermission().then(function(perm){
+    if(perm !== "granted"){ refreshPushUi(); return; }
+    return navigator.serviceWorker.ready.then(function(reg){
+      return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+    }).then(function(sub){
+      pushSub = sub;
+      refreshPushUi();
+      toast("Готово — скопируйте код подписки");
+    });
+  }).catch(function(){ toast("Не удалось включить уведомления"); });
+}
+document.getElementById("push-on").addEventListener("click", enablePush);
+document.getElementById("push-copy").addEventListener("click", function(){
+  if(!pushSub){ toast("Подписки нет"); return; }
+  copyText(JSON.stringify(pushSub), "Код скопирован — отправьте его");
+});
+
 if("serviceWorker" in navigator){
   // Контроллер уже был — значит эта вкладка работает на прежней версии,
   // и смена контроллера означает приехавшее обновление.
@@ -937,7 +1065,8 @@ if("serviceWorker" in navigator){
     navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function(reg){
       reg.update();
       setInterval(function(){ reg.update(); }, 3600000);
-    }).catch(function(){});
+      refreshPushUi();
+    }).catch(function(){ refreshPushUi(); });
   });
 }
 })();

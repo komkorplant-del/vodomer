@@ -1,5 +1,5 @@
 /* Водомер — офлайн-кэш. Страница обязана открываться без сети. */
-var CACHE = "vodomer-v2";
+var CACHE = "vodomer-v3";
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e){
@@ -45,6 +45,34 @@ self.addEventListener("fetch", function(e){
         return res;
       }).catch(function(){ return hit; });
       return hit || net;
+    })
+  );
+});
+
+/* --- Пуш-уведомления. Расписание живёт на сервере (GitHub Actions),
+       потому что iOS не даёт странице будить себя по таймеру. --- */
+self.addEventListener("push", function(e){
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch(err){ d = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Водомер", {
+    body: d.body || "Пора попить",
+    icon: "icon-192.png",
+    badge: "icon-192.png",
+    tag: d.tag || "vodomer",
+    renotify: true,
+    data: { url: d.url || "./" }
+  }));
+});
+
+self.addEventListener("notificationclick", function(e){
+  e.notification.close();
+  var target = new URL((e.notification.data && e.notification.data.url) || "./", self.location.href).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(list){
+      for(var i = 0; i < list.length; i++){
+        if(list[i].url.indexOf(self.registration.scope) === 0 && "focus" in list[i]) return list[i].focus();
+      }
+      return self.clients.openWindow ? self.clients.openWindow(target) : null;
     })
   );
 });
