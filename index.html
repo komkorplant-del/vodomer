@@ -370,11 +370,14 @@ function loadLocal(){
   var raw = null, saved = null;
   try { raw = localStorage.getItem(LS); } catch(e){}
   if(raw){ try { saved = JSON.parse(raw); } catch(e){} }
-  state.settings = Object.assign({}, DEFAULTS, (saved && saved.settings) || {});
+  var savedCfg = (saved && saved.settings) || null;
+  // Версию читаем из СОХРАНЁННОГО, а не из слитого с DEFAULTS: там она всегда текущая.
+  var savedVer = savedCfg ? (savedCfg.cfgVersion || 1) : CFG_VERSION;
+  state.settings = Object.assign({}, DEFAULTS, savedCfg || {});
   if(!Array.isArray(state.settings.vitamins)) state.settings.vitamins = DEFAULTS.vitamins.slice();
   if(!Array.isArray(state.settings.quick) || !state.settings.quick.length) state.settings.quick = DEFAULTS.quick.slice();
   // Настройки, сохранённые до 06.09.2026, держат старые цель и окно — подтягиваем к текущим.
-  if((state.settings.cfgVersion || 1) < CFG_VERSION){
+  if(savedVer < CFG_VERSION){
     state.settings.goal = DEFAULTS.goal;
     state.settings.to = DEFAULTS.to;
     state.settings.quick = DEFAULTS.quick.slice();
