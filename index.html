@@ -1047,10 +1047,18 @@ function pushPlan(){
   if(!pushSub) return;
   clearTimeout(planTimer);
   planTimer = setTimeout(function(){
+    var plan = buildPlan();
     fetch(PUSH_API + "/plan", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: pushSub, plan: buildPlan() })
-    }).catch(function(){});
+      body: JSON.stringify({ subscription: pushSub, plan: plan })
+    }).then(function(){
+      var next = plan[0];
+      var note = document.getElementById("push-note");
+      if(next && note) note.textContent = "Ближайшее напоминание в " + hhmm(next.at) + " — «" + next.body + "».";
+    }).catch(function(){
+      var note = document.getElementById("push-note");
+      if(note) note.textContent = "Сервер не ответил — напоминания могут не прийти.";
+    });
   }, 1500);
 }
 
@@ -1105,7 +1113,10 @@ function refreshPushUi(){
 }
 var pushSub = null;
 function enablePush(silent){
-  return Notification.requestPermission().then(function(perm){
+  var ask = Notification.permission === "granted"
+    ? Promise.resolve("granted")
+    : Notification.requestPermission();
+  return ask.then(function(perm){
     if(perm !== "granted"){ refreshPushUi(); return; }
     return navigator.serviceWorker.ready.then(function(reg){
       return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
@@ -1115,12 +1126,22 @@ function enablePush(silent){
       return fetch(PUSH_API + "/plan", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscription: sub, plan: buildPlan() })
-      }).then(function(){
+      }).then(function(r){
+        return r.json().catch(function(){ return {}; });
+      }).then(function(d){
         refreshPushUi();
+        var n = d && d["принято"];
+        document.getElementById("push-note").textContent = n
+          ? "Сервер принял план: " + n + " ближайших напоминаний."
+          : "Подписка создана, но сервер не подтвердил план — нажмите проверочное.";
         if(!silent) toast("Готово — напоминания включены");
       });
     });
-  }).catch(function(){ if(!silent) toast("Не удалось включить уведомления"); });
+  }).catch(function(){
+    setPushState("Уведомления не подключились", false, true,
+      "Нажмите кнопку — подписку нужно пересоздать вручную.");
+    if(!silent) toast("Не удалось включить уведомления");
+  });
 }
 document.getElementById("push-on").addEventListener("click", enablePush);
 document.getElementById("push-test").addEventListener("click", function(){
