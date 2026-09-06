@@ -173,6 +173,9 @@ summary::-webkit-details-marker{display:none}
 summary::after{content:"+";font-family:"Spline Sans Mono",monospace;color:var(--faint);font-size:18px}
 details[open] summary::after{content:"–"}
 .settings{padding:0 14px 14px;display:flex;flex-direction:column;gap:16px}
+.body{padding:0 14px 14px}
+summary{gap:8px}
+.tally{margin-left:auto;margin-right:10px;font-family:"Spline Sans Mono",monospace;font-size:11px;font-weight:500;color:var(--faint);letter-spacing:.04em}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-family:"Spline Sans Mono",monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
 .field input,.field select{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px;color:var(--ink);font-size:15px;font-family:inherit;width:100%}
@@ -244,17 +247,21 @@ details[open] summary::after{content:"–"}
     <div id="vit-list"></div>
   </section>
 
-  <section class="card">
-    <div class="lab">Что было за день</div>
-    <div class="log" id="log"></div>
-  </section>
+  <details id="d-log">
+    <summary>Что было за день <span class="tally num" id="log-tally"></span></summary>
+    <div class="body">
+      <div class="log" id="log"></div>
+    </div>
+  </details>
 
-  <section class="card">
-    <div class="lab">Итог дня</div>
-    <div class="summary" id="summary"></div>
-    <div class="lab" style="margin-top:2px">Вода за 7 дней</div>
-    <div class="week" id="week"></div>
-  </section>
+  <details id="d-sum">
+    <summary>Итог дня <span class="tally num" id="sum-tally"></span></summary>
+    <div class="body">
+      <div class="summary" id="summary"></div>
+      <div class="lab" style="margin-top:14px">Вода за 7 дней</div>
+      <div class="week" id="week"></div>
+    </div>
+  </details>
 
   <details id="cfg-export">
     <summary>Выгрузка для ChatGPT, Gemini и Claude</summary>
@@ -559,6 +566,10 @@ function render(){
   renderVits(s);
   renderLog(k, s);
   renderSummary(s);
+  document.getElementById("log-tally").textContent =
+    s.evs.length ? s.evs.length + " " + plural(s.evs.length, "запись", "записи", "записей") : "пусто";
+  document.getElementById("sum-tally").textContent =
+    Math.round(s.ml / cfg.goal * 100) + "% цели · " + s.pee + " " + plural(s.pee, "раз", "раза", "раз");
   renderWeek();
   renderAlarms();
   renderPreview();
@@ -913,6 +924,16 @@ document.getElementById("ml-input").addEventListener("keydown", function(e){
   if(e.key === "Enter"){ addWater(+this.value); this.value = ""; this.blur(); }
 });
 document.getElementById("pee-btn").addEventListener("click", addPee);
+
+// Раскрытые разделы запоминаются, чтобы не открывать их каждый раз заново
+["d-log","d-sum","cfg-export","cfg"].forEach(function(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  try { if(localStorage.getItem("vodomer.open." + id) === "1") el.open = true; } catch(e){}
+  el.addEventListener("toggle", function(){
+    try { localStorage.setItem("vodomer.open." + id, el.open ? "1" : "0"); } catch(e){}
+  });
+});
 
 Array.prototype.forEach.call(document.querySelectorAll("#drink-seg button"), function(b){
   b.addEventListener("click", function(){
