@@ -370,7 +370,7 @@ function loadLocal(){
   var raw = null, saved = null;
   try { raw = localStorage.getItem(LS); } catch(e){}
   if(raw){ try { saved = JSON.parse(raw); } catch(e){} }
-  var savedCfg = (saved && saved.settings) || null;
+  var savedCfg = (saved && saved.settings) || null, migrated = false;
   // Версию читаем из СОХРАНЁННОГО, а не из слитого с DEFAULTS: там она всегда текущая.
   var savedVer = savedCfg ? (savedCfg.cfgVersion || 1) : CFG_VERSION;
   state.settings = Object.assign({}, DEFAULTS, savedCfg || {});
@@ -386,8 +386,10 @@ function loadLocal(){
       state.settings.vitamins = DEFAULTS.vitamins.map(function(v){ return Object.assign({}, v); });
     }
     state.settings.cfgVersion = CFG_VERSION;
+    migrated = true;
   }
   state.days = (saved && saved.days) || {};
+  if(migrated) saveLocal();   // иначе новые значения живут только в памяти до первого действия
 }
 function saveLocal(){
   try { localStorage.setItem(LS, JSON.stringify(state)); }
