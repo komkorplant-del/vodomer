@@ -1063,6 +1063,12 @@ function pushPlan(){
   clearTimeout(planTimer);
   planTimer = setTimeout(function(){
     var plan = buildPlan();
+    // Отчёт за сегодня кладём рядом: в 23:59 приложение может быть закрыто,
+    // а отправить его в чат умеет только компьютер.
+    fetch(PUSH_API + "/report", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: buildReport(1), day: todayKey() })
+    }).catch(function(){});
     fetch(PUSH_API + "/plan", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscription: pushSub, plan: plan })
