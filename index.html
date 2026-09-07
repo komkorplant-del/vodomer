@@ -976,6 +976,14 @@ document.getElementById("copy-alarms").addEventListener("click", function(){
   copyText(alarmTimes().join(", "), "Времена скопированы");
 });
 
+// Пришли из уведомления «Итог дня» — кладём отчёт в буфер, чтобы осталось только вставить
+if(location.hash === "#report"){
+  history.replaceState(null, "", location.pathname);
+  setTimeout(function(){
+    var d = document.getElementById("cfg-export"); if(d) d.open = true;
+    copyText(buildReport(1), "Отчёт за день скопирован — вставьте в чат");
+  }, 600);
+}
 document.getElementById("e-period").addEventListener("change", renderPreview);
 document.getElementById("e-copy").addEventListener("click", function(){
   copyText(buildReport(currentPeriod()), "Скопировано — вставляйте в чат");
@@ -1055,6 +1063,11 @@ function buildPlan(){
     var t = new Date(d); t.setDate(t.getDate() + 1);
     plan.push({ at: t.getTime(), title: "Витамины", body: text });
   });
+  // Итог дня в 23:59: пуш приходит от сервера, компьютер для него не нужен.
+  for(var d = 0; d <= 1; d++){
+    var r = new Date(); r.setDate(r.getDate() + d); r.setHours(23, 59, 0, 0);
+    if(r.getTime() > now) plan.push({ at: r.getTime(), title: "Итог дня", body: "Отчёт готов — открой, он скопируется для чата" });
+  }
   return plan.sort(function(a,b){ return a.at - b.at; }).slice(0, 40);
 }
 var planTimer = null;
