@@ -1,5 +1,5 @@
 /* Водомер — офлайн-кэш. Страница обязана открываться без сети. */
-var CACHE = "vodomer-v3";
+var CACHE = "vodomer-v4";
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e){
@@ -60,7 +60,7 @@ self.addEventListener("push", function(e){
     badge: "icon-192.png",
     tag: d.tag || "vodomer",
     renotify: true,
-    data: { url: d.url || "./" }
+    data: { url: d.url || (d.title === "Итог дня" ? "./#report" : "./") }
   }));
 });
 
