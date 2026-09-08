@@ -496,10 +496,24 @@ function addPee(){
   renderShades(); renderVolumes();
 }
 var PEE_VOLUMES = [100, 150, 200, 250, 300, 400];
+
+/* К какой записи привязать объём или оттенок. Обычно это последняя отметка,
+   но пока человек набирает число руками, окно успевает закрыться и lastPeeId теряется —
+   поэтому берём последнее мочеиспускание за последние полчаса. */
+function peeTarget(){
+  var evs = dayEvents(todayKey()).filter(function(e){ return e.k === "p"; });
+  if(lastPeeId){
+    var byId = evs.filter(function(e){ return e.id === lastPeeId; })[0];
+    if(byId) return byId;
+  }
+  var last = evs[evs.length - 1];
+  return (last && Date.now() - last.t < 30 * 60000) ? last : null;
+}
 function setPeeVolume(ml){
-  if(!lastPeeId) return;
-  var k = todayKey(), d = state.days[k];
-  if(d) d.events.forEach(function(e){ if(e.id === lastPeeId){ e.v = ml; e.up = Date.now(); } });
+  var target = peeTarget();
+  if(!target){ toast("Сначала нажмите «Отметить»"); return; }
+  target.v = ml; target.up = Date.now();
+  lastPeeId = target.id;
   saveLocal(); render(); pushPlan();
   toast(ml + " мл записано");
 }
@@ -524,9 +538,10 @@ function renderVolumes(){
   if(f && document.activeElement !== f) f.value = (cur && PEE_VOLUMES.indexOf(cur) < 0) ? cur : "";
 }
 function setShade(n){
-  if(!lastPeeId) return;
-  var k = todayKey(), d = state.days[k];
-  if(d) d.events.forEach(function(e){ if(e.id === lastPeeId){ e.shade = n; e.up = Date.now(); } });
+  var target = peeTarget();
+  if(!target){ toast("Сначала нажмите «Отметить»"); return; }
+  target.shade = n; target.up = Date.now();
+  lastPeeId = target.id;
   saveLocal();
   document.getElementById("shade-hint").innerHTML =
     n <= 3 ? "<b>Норма.</b> Гидратация в порядке."
@@ -996,6 +1011,11 @@ function addOwnVolume(){
   i.blur();
 }
 document.getElementById("vol-add").addEventListener("click", addOwnVolume);
+["focus", "input"].forEach(function(ev){
+  document.getElementById("vol-input").addEventListener(ev, function(){
+    clearTimeout(document.getElementById("shade-block")._h);   // набирает число — не закрываем
+  });
+});
 document.getElementById("vol-input").addEventListener("keydown", function(e){
   if(e.key === "Enter") addOwnVolume();
 });
