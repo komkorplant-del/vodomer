@@ -130,6 +130,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .pee-count{font-family:"Spline Sans Mono",monospace;font-size:13px;opacity:.8}
 .shades{display:flex;flex-direction:column;gap:8px}
 .shade-row{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.vol-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.vol-row button{min-height:44px;border-radius:9px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-weight:600;font-size:15px}
+.vol-row button[aria-pressed="true"]{background:var(--amber);color:var(--bg)}
 .shade{height:44px;border-radius:9px;border:1px solid var(--line-strong);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:#3A2E12;font-weight:600}
 .shade[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:1px}
 .shade-hint{font-size:13px;color:var(--muted)}
@@ -247,7 +250,9 @@ summary{gap:8px}
     <div class="lab">Мочеиспускание</div>
     <button class="pee-btn" id="pee-btn">Отметить <span class="pee-count num" id="pee-count"></span></button>
     <div class="shades" id="shade-block" hidden>
-      <div class="lab">Цвет — по шкале гидратации</div>
+      <div class="lab">Объём, мл</div>
+      <div class="vol-row" id="vol-row"></div>
+      <div class="lab" style="margin-top:2px">Цвет — по шкале гидратации</div>
       <div class="shade-row" id="shade-row"></div>
       <div class="shade-hint" id="shade-hint">1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.</div>
     </div>
@@ -481,8 +486,33 @@ function addPee(){
   block.hidden = false;
   document.getElementById("shade-hint").innerHTML = "1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.";
   clearTimeout(block._h);
-  block._h = setTimeout(function(){ block.hidden = true; lastPeeId = null; renderShades(); }, 25000);
-  renderShades();
+  block._h = setTimeout(function(){ block.hidden = true; lastPeeId = null; renderShades(); renderVolumes(); }, 45000);
+  renderShades(); renderVolumes();
+}
+var PEE_VOLUMES = [100, 150, 200, 250, 300, 400];
+function setPeeVolume(ml){
+  if(!lastPeeId) return;
+  var k = todayKey(), d = state.days[k];
+  if(d) d.events.forEach(function(e){ if(e.id === lastPeeId){ e.v = ml; e.up = Date.now(); } });
+  saveLocal(); render(); pushPlan();
+  toast(ml + " мл записано");
+}
+function renderVolumes(){
+  var row = document.getElementById("vol-row");
+  if(!row.childElementCount){
+    PEE_VOLUMES.forEach(function(ml){
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = ml;
+      b.setAttribute("aria-label", "Объём " + ml + " миллилитров");
+      b.addEventListener("click", function(){ setPeeVolume(ml); });
+      row.appendChild(b);
+    });
+  }
+  var cur = 0;
+  if(lastPeeId) dayEvents(todayKey()).forEach(function(e){ if(e.id === lastPeeId && e.v) cur = e.v; });
+  Array.prototype.forEach.call(row.children, function(b, i){
+    b.setAttribute("aria-pressed", cur === PEE_VOLUMES[i] ? "true" : "false");
+  });
 }
 function setShade(n){
   if(!lastPeeId) return;
@@ -509,17 +539,17 @@ function toggleVit(vid){
 /* ---------- расчёты ---------- */
 function dayStats(k){
   var evs = dayEvents(k);
-  var ml = 0, water = 0, tea = 0, pee = 0, shades = [], vits = {}, lastW = 0;
+  var ml = 0, water = 0, tea = 0, pee = 0, peeMl = 0, shades = [], vits = {}, lastW = 0;
   evs.forEach(function(e){
     if(e.k === "w"){
       ml += e.ml;
       if(e.d === "t") tea += e.ml; else water += e.ml;   // записи без пометки — вода
       if(e.t > lastW) lastW = e.t;
     }
-    else if(e.k === "p"){ pee++; if(e.shade) shades.push(e.shade); }
+    else if(e.k === "p"){ pee++; if(e.shade) shades.push(e.shade); if(e.v) peeMl += e.v; }
     else if(e.k === "v"){ vits[e.vid] = true; }
   });
-  return { key: k, ml: ml, water: water, tea: tea, pee: pee, shades: shades, vits: vits, lastW: lastW, evs: evs };
+  return { key: k, ml: ml, water: water, tea: tea, pee: pee, peeMl: peeMl, shades: shades, vits: vits, lastW: lastW, evs: evs };
 }
 function recentKeys(n){
   var out = [], now = Date.now();
@@ -575,6 +605,7 @@ function render(){
   renderQuick();
   document.getElementById("pee-count").textContent = s.pee ? "· " + s.pee + " " + plural(s.pee,"раз","раза","раз") : "";
   renderShades();
+  renderVolumes();
   renderVits(s);
   renderLog(k, s);
   renderSummary(s);
@@ -685,7 +716,9 @@ function renderLog(k, s){
     row.className = "log-row";
     var color = e.k === "w" ? "var(--accent)" : e.k === "p" ? "var(--amber)" : "var(--line-strong)";
     var text = e.k === "w" ? '<span class="amt num">' + e.ml + '</span> мл ' + DRINKS[e.d === "t" ? "t" : "w"].gen
-             : e.k === "p" ? ("Мочеиспускание" + (e.shade ? ' · оттенок <span class="amt num">' + e.shade + '</span>' : ""))
+             : e.k === "p" ? ("Мочеиспускание"
+                 + (e.v ? ' · <span class="amt num">' + e.v + '</span> мл' : "")
+                 + (e.shade ? ' · оттенок <span class="amt num">' + e.shade + '</span>' : ""))
              : (esc(vitName[e.vid] || e.vn || "витамин") + " принят");
     row.innerHTML = '<div class="log-time num">' + hhmm(e.t) + '</div>' +
                     '<div class="log-mark" style="background:' + color + '"></div>' +
@@ -716,6 +749,11 @@ function renderSummary(s){
     { v: vitDone + "/" + cfg.vitamins.length, k: "витамины" }
   ];
   if(s.tea) cells.push({ v: s.water + '<span class="u">мл</span>', k: "из них чистой воды" });
+  if(s.peeMl){
+    cells.push({ v: s.peeMl + '<span class="u">мл</span>', k: "выделено" });
+    var bal = s.ml - s.peeMl;
+    cells.push({ v: (bal >= 0 ? "+" : "") + bal + '<span class="u">мл</span>', k: "баланс" });
+  }
   if(avgShade) cells.push({ v: avgShade.toFixed(1), k: "средний оттенок" });
   if(s.lastW) cells.push({ v: hhmm(s.lastW), k: "последний глоток" });
   box.innerHTML = "";
@@ -817,7 +855,7 @@ function buildReport(days){
   if(!keys.length){ L.push("Записей за период нет."); return L.join("\n"); }
 
   L.push("ПО ДНЯМ (жидкость = вода + чай; цель считается по всей жидкости)");
-  L.push("дата        жидк_мл  вода_мл  чай_мл  %цели  мочеисп  ср_оттенок  витамины  первый  последний");
+  L.push("дата        жидк_мл  вода_мл  чай_мл  %цели  мочеисп  диурез_мл  баланс_мл  ср_оттенок  витамины  первый  последний");
   var tot = { ml:0, water:0, tea:0, pee:0, sh:[], vd:0, vt:0 };
   keys.forEach(function(k){
     var s = dayStats(k);
@@ -833,6 +871,8 @@ function buildReport(days){
       String(s.tea).padStart(6) + "  " +
       String(Math.round(s.ml/cfg.goal*100)).padStart(5) + "  " +
       String(s.pee).padStart(7) + "  " +
+      (s.peeMl ? String(s.peeMl) : "—").padStart(9) + "  " +
+      (s.peeMl ? String(s.ml - s.peeMl) : "—").padStart(9) + "  " +
       (avg ? avg.toFixed(1) : "—").padStart(10) + "  " +
       (vd + "/" + cfg.vitamins.length).padStart(8) + "  " +
       (w.length ? hhmm(w[0].t) : "—").padStart(6) + "  " +
@@ -859,7 +899,7 @@ function buildReport(days){
     dayEvents(k).forEach(function(e){
       L.push("  " + hhmm(e.t) + "  " + (
         e.k === "w" ? (e.d === "t" ? "чай " : "вода ") + e.ml + " мл"
-      : e.k === "p" ? "мочеиспускание" + (e.shade ? ", оттенок " + e.shade : "")
+      : e.k === "p" ? "мочеиспускание" + (e.v ? ", " + e.v + " мл" : "") + (e.shade ? ", оттенок " + e.shade : "")
       : "витамин: " + (vitName[e.vid] || e.vn || e.vid)
       ));
     });
@@ -874,7 +914,7 @@ function buildCsv(days){
     dayEvents(k).forEach(function(e){
       rows.push([k, hhmm(e.t),
         e.k === "w" ? (e.d === "t" ? "чай" : "вода") : e.k === "p" ? "мочеиспускание" : "витамин",
-        e.k === "w" ? e.ml : "", e.shade || "",
+        e.k === "w" ? e.ml : (e.v || ""), e.shade || "",
         e.vid ? (vitName[e.vid] || e.vn || e.vid) : ""].join(","));
     });
   });
