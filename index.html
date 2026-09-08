@@ -133,6 +133,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .vol-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .vol-row button{min-height:44px;border-radius:9px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-weight:600;font-size:15px}
 .vol-row button[aria-pressed="true"]{background:var(--amber);color:var(--bg)}
+.vol-free input{height:46px;font-size:16px}
+.vol-free button{height:46px;padding:0 16px;border-color:var(--amber);color:var(--amber)}
 .shade{height:44px;border-radius:9px;border:1px solid var(--line-strong);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:#3A2E12;font-weight:600}
 .shade[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:1px}
 .shade-hint{font-size:13px;color:var(--muted)}
@@ -252,6 +254,10 @@ summary{gap:8px}
     <div class="shades" id="shade-block" hidden>
       <div class="lab">Объём, мл</div>
       <div class="vol-row" id="vol-row"></div>
+      <div class="freeform vol-free">
+        <input id="vol-input" type="number" inputmode="numeric" min="1" max="2000" step="10" placeholder="Свой объём, мл" aria-label="Объём мочеиспускания в миллилитрах">
+        <button id="vol-add">Записать</button>
+      </div>
       <div class="lab" style="margin-top:2px">Цвет — по шкале гидратации</div>
       <div class="shade-row" id="shade-row"></div>
       <div class="shade-hint" id="shade-hint">1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.</div>
@@ -513,6 +519,9 @@ function renderVolumes(){
   Array.prototype.forEach.call(row.children, function(b, i){
     b.setAttribute("aria-pressed", cur === PEE_VOLUMES[i] ? "true" : "false");
   });
+  // Своё число показываем в поле, чтобы было видно, что записано
+  var f = document.getElementById("vol-input");
+  if(f && document.activeElement !== f) f.value = (cur && PEE_VOLUMES.indexOf(cur) < 0) ? cur : "";
 }
 function setShade(n){
   if(!lastPeeId) return;
@@ -976,6 +985,20 @@ document.getElementById("ml-input").addEventListener("keydown", function(e){
   if(e.key === "Enter"){ addWater(+this.value); this.value = ""; this.blur(); }
 });
 document.getElementById("pee-btn").addEventListener("click", addPee);
+
+function addOwnVolume(){
+  var i = document.getElementById("vol-input"), ml = Math.round(+i.value);
+  if(!(ml > 0)){ toast("Введите число"); return; }
+  if(ml > 2000){ toast("Больше 2 литров за раз — вряд ли"); return; }
+  var block = document.getElementById("shade-block");
+  clearTimeout(block._h);                       // печатал вручную — окно не закрываем по таймеру
+  setPeeVolume(ml);
+  i.blur();
+}
+document.getElementById("vol-add").addEventListener("click", addOwnVolume);
+document.getElementById("vol-input").addEventListener("keydown", function(e){
+  if(e.key === "Enter") addOwnVolume();
+});
 
 // Раскрытые разделы запоминаются, чтобы не открывать их каждый раз заново
 ["d-log","d-sum","cfg-export","cfg"].forEach(function(id){
