@@ -130,11 +130,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .pee-count{font-family:"Spline Sans Mono",monospace;font-size:13px;opacity:.8}
 .shades{display:flex;flex-direction:column;gap:8px}
 .shade-row{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
-.vol-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.vol-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .vol-row button{min-height:44px;border-radius:9px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-weight:600;font-size:15px}
 .vol-row button[aria-pressed="true"]{background:var(--amber);color:var(--bg)}
 .vol-free input{height:46px;font-size:16px}
-.vol-free button{height:46px;padding:0 16px;border-color:var(--amber);color:var(--amber)}
 .shade{height:44px;border-radius:9px;border:1px solid var(--line-strong);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:"Spline Sans Mono",monospace;font-size:10px;color:#3A2E12;font-weight:600}
 .shade[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:1px}
 .shade-hint{font-size:13px;color:var(--muted)}
@@ -255,8 +254,7 @@ summary{gap:8px}
       <div class="lab">Объём, мл</div>
       <div class="vol-row" id="vol-row"></div>
       <div class="freeform vol-free">
-        <input id="vol-input" type="number" inputmode="numeric" min="1" max="2000" step="10" placeholder="Свой объём, мл" aria-label="Объём мочеиспускания в миллилитрах">
-        <button id="vol-add">Записать</button>
+        <input id="vol-input" type="number" inputmode="numeric" min="1" max="2000" step="5" placeholder="Свой объём, мл — затем нажмите цвет" aria-label="Объём мочеиспускания в миллилитрах">
       </div>
       <div class="lab" style="margin-top:2px">Цвет — по шкале гидратации</div>
       <div class="shade-row" id="shade-row"></div>
@@ -488,6 +486,7 @@ function addPee(){
   var id = uid();
   addEvent({ id: id, t: Date.now(), k: "p" });
   lastPeeId = id;
+  var vf = document.getElementById("vol-input"); if(vf) vf.value = "";
   var block = document.getElementById("shade-block");
   block.hidden = false;
   document.getElementById("shade-hint").innerHTML = "1–3 — норма. 4–5 — пейте больше. 6 — обезвоживание.";
@@ -495,7 +494,7 @@ function addPee(){
   block._h = setTimeout(function(){ block.hidden = true; lastPeeId = null; renderShades(); renderVolumes(); }, 45000);
   renderShades(); renderVolumes();
 }
-var PEE_VOLUMES = [100, 150, 200, 250, 300, 400];
+var PEE_VOLUMES = [75, 100, 125, 150, 175, 200, 225, 250];
 
 /* К какой записи привязать объём или оттенок. Обычно это последняя отметка,
    но пока человек набирает число руками, окно успевает закрыться и lastPeeId теряется —
@@ -514,6 +513,7 @@ function setPeeVolume(ml){
   if(!target){ toast("Сначала нажмите «Отметить»"); return; }
   target.v = ml; target.up = Date.now();
   lastPeeId = target.id;
+  var vf = document.getElementById("vol-input"); if(vf) vf.value = "";
   saveLocal(); render(); pushPlan();
   toast(ml + " мл записано");
 }
@@ -540,6 +540,9 @@ function renderVolumes(){
 function setShade(n){
   var target = peeTarget();
   if(!target){ toast("Сначала нажмите «Отметить»"); return; }
+  var vf = document.getElementById("vol-input"), typed = vf ? Math.round(+vf.value) : 0;
+  if(typed > 2000){ toast("Больше 2 литров за раз — вряд ли"); return; }
+  if(typed > 0) target.v = typed;          // набранное руками уходит вместе с цветом
   target.shade = n; target.up = Date.now();
   lastPeeId = target.id;
   saveLocal();
@@ -1010,7 +1013,6 @@ function addOwnVolume(){
   setPeeVolume(ml);
   i.blur();
 }
-document.getElementById("vol-add").addEventListener("click", addOwnVolume);
 ["focus", "input"].forEach(function(ev){
   document.getElementById("vol-input").addEventListener(ev, function(){
     clearTimeout(document.getElementById("shade-block")._h);   // набирает число — не закрываем
