@@ -890,10 +890,10 @@ function buildReport(days){
     var pees = evs.filter(function(e){ return e.k === "p"; });
     var sum = function(list, f){ return list.reduce(function(a, e){ return a + (f(e) || 0); }, 0); };
     L.push("=== " + ruDate(k) + " ===");
-    L.push("ВЫПИЛ — когда и сколько (всего " + sum(drinks, function(e){ return e.ml; }) + " мл, " + drinks.length + " раз):");
+    L.push("ВЫПИЛ — когда и сколько (всего " + sum(drinks, function(e){ return e.ml; }) + " мл, " + drinks.length + " " + plural(drinks.length, "раз", "раза", "раз") + "):");
     if(!drinks.length) L.push("  записей нет");
     drinks.forEach(function(e){ L.push("  " + hhmm(e.t) + " — " + e.ml + " мл" + (e.d === "t" ? " (чай)" : "")); });
-    L.push("ПОМОЧИЛСЯ — когда и сколько (всего " + sum(pees, function(e){ return e.v; }) + " мл, " + pees.length + " раз):");
+    L.push("ПОМОЧИЛСЯ — когда и сколько (всего " + sum(pees, function(e){ return e.v; }) + " мл, " + pees.length + " " + plural(pees.length, "раз", "раза", "раз") + "):");
     if(!pees.length) L.push("  записей нет");
     pees.forEach(function(e){
       L.push("  " + hhmm(e.t) + " — " + (e.v ? e.v + " мл" : "объём не отмечен") + (e.shade ? ", оттенок " + e.shade : ""));
