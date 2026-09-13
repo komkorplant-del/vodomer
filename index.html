@@ -1086,7 +1086,7 @@ function sendToChat(){
     body: JSON.stringify({ subscription: pushSub, text: text, day: todayKey() })
   }).then(function(r){ return r.json(); }).then(function(d){
     if(!d.ok){ finish("Сервер не принял: " + (d.error || "отказ")); return; }
-    var started = Date.now();
+    var started = Date.now(), sending = false;
     (function poll(){
       fetch(PUSH_API + "/send-request?id=" + encodeURIComponent(d.id))
         .then(function(r){ return r.json(); })
@@ -1095,10 +1095,15 @@ function sendToChat(){
           if(st.id === d.id && /^ошибка/.test(st.status || "")){
             finish("Не отправлено: " + (st.note || st.status) + ". Скопируйте кнопкой ниже"); return;
           }
-          if(Date.now() - started > 180000){
+          // Компьютер взял запрос — дальше он ждёт ответ ChatGPT, с «Размышлением» это до 15 минут
+          if(st.id === d.id && st.status === "отправляю") sending = true;
+          if(!sending && Date.now() - started > 180000){
             finish("Компьютер не ответил за 3 минуты — скопируйте кнопкой ниже"); return;
           }
-          btn.textContent = st.status === "отправляю" ? "Отправляю в чат…" : "Жду компьютер…";
+          if(sending && Date.now() - started > 17 * 60000){
+            finish("Сообщение ушло, но подтверждения нет — загляните в чат «Диетолог»"); return;
+          }
+          btn.textContent = sending ? "Отправлено, жду ответ диетолога…" : "Жду компьютер…";
           setTimeout(poll, 8000);
         })
         .catch(function(){ setTimeout(poll, 8000); });
