@@ -297,7 +297,8 @@ summary{gap:8px}
       </div>
       <div class="preview num" id="e-preview">—</div>
       <div class="btn-col">
-        <button class="ghost primary" id="e-copy">Скопировать текст для чата</button>
+        <button class="ghost primary" id="e-send">Отправить в ChatGPT — «Диетолог»</button>
+        <button class="ghost" id="e-copy">Скопировать текст для чата</button>
         <button class="ghost" id="e-share">Отправить файлом</button>
         <button class="ghost" id="e-csv">Скачать CSV</button>
       </div>
@@ -1070,6 +1071,41 @@ if(location.hash === "#report"){
   }, 600);
 }
 document.getElementById("e-period").addEventListener("change", renderPreview);
+
+/* Кнопка «Отправить в ChatGPT»: отчёт уходит на сервер, компьютер забирает его и пишет
+   в чат «Диетолог» через свою сессию ChatGPT. Телефон ждёт статус до трёх минут. */
+var SEND_LABEL = "Отправить в ChatGPT — «Диетолог»";
+function sendToChat(){
+  var btn = document.getElementById("e-send");
+  if(!pushSub){ toast("Сначала включите уведомления в настройках"); return; }
+  var text = buildReport(currentPeriod());
+  btn.disabled = true; btn.textContent = "Передаю…";
+  var finish = function(msg){ btn.disabled = false; btn.textContent = SEND_LABEL; toast(msg); };
+  fetch(PUSH_API + "/send-request", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription: pushSub, text: text, day: todayKey() })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(!d.ok){ finish("Сервер не принял: " + (d.error || "отказ")); return; }
+    var started = Date.now();
+    (function poll(){
+      fetch(PUSH_API + "/send-request?id=" + encodeURIComponent(d.id))
+        .then(function(r){ return r.json(); })
+        .then(function(st){
+          if(st.id === d.id && st.status === "отправлено"){ finish("Отправлено в чат «Диетолог»"); return; }
+          if(st.id === d.id && /^ошибка/.test(st.status || "")){
+            finish("Не отправлено: " + (st.note || st.status) + ". Скопируйте кнопкой ниже"); return;
+          }
+          if(Date.now() - started > 180000){
+            finish("Компьютер не ответил за 3 минуты — скопируйте кнопкой ниже"); return;
+          }
+          btn.textContent = st.status === "отправляю" ? "Отправляю в чат…" : "Жду компьютер…";
+          setTimeout(poll, 8000);
+        })
+        .catch(function(){ setTimeout(poll, 8000); });
+    })();
+  }).catch(function(){ finish("Сервер не ответил"); });
+}
+document.getElementById("e-send").addEventListener("click", sendToChat);
 document.getElementById("e-copy").addEventListener("click", function(){
   copyText(buildReport(currentPeriod()), "Скопировано — вставляйте в чат");
 });
