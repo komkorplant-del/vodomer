@@ -366,7 +366,7 @@ summary{gap:8px}
 (function(){
 "use strict";
 
-var DAY_START = 4;
+var DAY_START = 0;   // сутки календарные, с полуночи (слово Дениса 14.09.2026; до этого было 04:00)
 var LS = "vodomer.v1";
 var SHADES = ["#F6F4DE","#F2EBB4","#EBDD84","#E2C755","#CC9E2E","#A56A12"];
 var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -444,6 +444,21 @@ function loadLocal(){
     migrated = true;
   }
   state.days = (saved && saved.days) || {};
+  // Граница суток менялась (04:00 → 00:00): запись с 00:00 до 04:00 могла лежать во вчерашних
+  // сутках. Раскладываем все записи заново по их времени; повторный прогон ничего не меняет.
+  var moved = 0, regrouped = {};
+  Object.keys(state.days).forEach(function(k){
+    ((state.days[k] || {}).events || []).forEach(function(e){
+      var nk = dayKey(e.t);
+      if(nk !== k) moved++;
+      (regrouped[nk] = regrouped[nk] || { events: [] }).events.push(e);
+    });
+  });
+  if(moved){
+    Object.keys(regrouped).forEach(function(k){ regrouped[k].events.sort(function(a,b){ return a.t - b.t; }); });
+    state.days = regrouped;
+    migrated = true;
+  }
   if(migrated) saveLocal();   // иначе новые значения живут только в памяти до первого действия
 }
 function saveLocal(){
@@ -873,7 +888,7 @@ function buildReport(days){
   L.push("ДНЕВНИК ГИДРАТАЦИИ И ВИТАМИНОВ");
   L.push("Период: " + periodLabel(keys) + " (" + keys.length + " " + plural(keys.length,"день","дня","дней") + " с записями)");
   L.push("Цель по жидкости: " + cfg.goal + " мл в сутки. Основной приём " + cfg.from + "–" + cfg.to + ", интервал " + cfg.interval + " мин; после " + cfg.to + " вода тоже записывается.");
-  L.push("Сутки считаются с 04:00 до 04:00.");
+  L.push("Сутки — календарные, с 00:00 до 24:00.");
   L.push("План витаминов: " + (cfg.vitamins.length
     ? cfg.vitamins.map(function(v){ return v.name + (v.dose ? " " + v.dose : "") + " в " + v.time; }).join("; ")
     : "не заведён"));
