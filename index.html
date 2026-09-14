@@ -592,7 +592,7 @@ function periodKeys(days){
 /* ---------- отрисовка ---------- */
 function render(){
   var k = todayKey(), s = dayStats(k), cfg = state.settings, now = new Date();
-  document.getElementById("today-date").textContent = now.getDate() + " " + MONTHS[now.getMonth()];
+  document.getElementById("today-date").textContent = ruDate(k);
   document.getElementById("ml-total").textContent = s.ml;
   var left = cfg.goal - s.ml;
   var rest = document.querySelector(".big.rest");
@@ -1000,8 +1000,17 @@ loadLocal();
 fillSettings();
 render();
 
-setInterval(function(){ renderNudge(dayStats(todayKey())); }, 30000);
-document.addEventListener("visibilitychange", function(){ if(!document.hidden) render(); });
+var shownDay = todayKey();
+function refreshIfNewDay(){
+  var k = todayKey();
+  if(k !== shownDay){ shownDay = k; lastPeeId = null; render(); pushPlan(); }
+  else renderNudge(dayStats(k));
+}
+// 14.09.2026: итоги оставались вчерашними после 04:00 — раз в 30 с обновлялась только строка
+// напоминания, а приложение, возвращённое iOS из сна, событие visibilitychange получает не всегда.
+setInterval(refreshIfNewDay, 30000);
+["pageshow", "focus"].forEach(function(ev){ window.addEventListener(ev, function(){ shownDay = ""; refreshIfNewDay(); }); });
+document.addEventListener("visibilitychange", function(){ if(!document.hidden){ shownDay = ""; refreshIfNewDay(); } });
 
 document.getElementById("ml-add").addEventListener("click", function(){
   var i = document.getElementById("ml-input");
